@@ -1,6 +1,6 @@
 package com.carplate.camerax;
 
-
+import com.db.ConnectDB;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -33,7 +33,6 @@ import org.opencv.utils.Converters;
 import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.gpu.GpuDelegate;
 import org.tensorflow.lite.nnapi.NnApiDelegate;
-
 
 
 import java.io.IOException;
@@ -368,7 +367,10 @@ public class MainActivity extends AppCompatActivity
                             textView.setText(result2);
                             imageView.setImageBitmap(onFrame3);
                             beforePlate = result2;
-                            saveImg(onFrame3, result2)
+                            saveImg(onFrame3, result2);
+                            ConnectDB connectDB = ConnectDB().getInstance();
+                            String checkDB = connectDB.connectionDB(result2);
+                            Toast.makeText(this, checkDB, Toast.LENGTH_SHORT).show();
 
                         } catch (Exception e) {
                             e.printStackTrace();
