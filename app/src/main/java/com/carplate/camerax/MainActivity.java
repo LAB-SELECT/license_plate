@@ -355,19 +355,26 @@ public class MainActivity extends AppCompatActivity
             end = System.currentTimeMillis();
             double fps = Math.round(((1.0/(end-start))*1000*100.0))/100.0;
             String infer_result = fps + "  fps";
+            String beforePlate = "0";
 
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        tvTime.setText(infer_result);
-                        textView.setText(result2);
-                        imageView.setImageBitmap(onFrame3);
-                    } catch (Exception e) {
-                        e.printStackTrace();
+            if(result2.equlas(beforePlate)){}
+            else {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            tvTime.setText(infer_result);
+                            textView.setText(result2);
+                            imageView.setImageBitmap(onFrame3);
+                            beforePlate = result2;
+                            saveImg(onFrame3, result2)
+
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
                     }
-                }
-            });
+                });
+            }
         }
         else{
 
@@ -375,4 +382,46 @@ public class MainActivity extends AppCompatActivity
         }
         return matInput;
     }
+
+    private void saveImg(Bitmap bitmap, String textview) {
+
+        try {
+            //저장할 파일 경로
+            File storageDir = new File(getFilesDir() + "/capture");
+            if (!storageDir.exists()) //폴더가 없으면 생성.
+                storageDir.mkdirs();
+
+            String filename =  textView.getText().toString() + ".jpg";
+
+            // 기존에 있다면 삭제
+            File file = new File(storageDir, filename);
+            boolean deleted = file.delete();
+            Log.w(TAG, "Delete Dup Check : " + deleted);
+            FileOutputStream output = null;
+
+            try {
+                output = new FileOutputStream(file);
+                //BitmapDrawable drawable = (BitmapDrawable) ivCapture.getDrawable();
+                //Bitmap bitmap = drawable.getBitmap();
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 70, output); //해상도에 맞추어 Compress
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    assert output != null;
+                    output.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            Log.e(TAG, "Captured Saved");
+            Toast.makeText(this, "Capture Saved ", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Log.w(TAG, "Capture Saving Error!", e);
+            Toast.makeText(this, "Save failed", Toast.LENGTH_SHORT).show();
+
+        }
+    }
+
 }
