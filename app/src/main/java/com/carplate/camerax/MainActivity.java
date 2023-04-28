@@ -76,6 +76,8 @@ public class MainActivity extends AppCompatActivity
     private Bitmap onFrame2; // alignment input
     private Bitmap onFrame3; // char input
 
+    String beforePlate = "0";
+
     // 모델 정의
     DHDetectionModel detectionModel;
     AlignmentModel alignmentModel;
@@ -355,9 +357,8 @@ public class MainActivity extends AppCompatActivity
             end = System.currentTimeMillis();
             double fps = Math.round(((1.0/(end-start))*1000*100.0))/100.0;
             String infer_result = fps + "  fps";
-            String beforePlate = "0";
 
-            if(result2.equlas(beforePlate)){}
+            if(result2.equals(beforePlate)){}
             else {
                 runOnUiThread(new Runnable() {
                     @Override
@@ -387,7 +388,7 @@ public class MainActivity extends AppCompatActivity
 
         try {
             //저장할 파일 경로
-            File storageDir = new File(getFilesDir() + "/capture");
+            File storageDir = new File(getExternalFilesDir() + "/capture");
             if (!storageDir.exists()) //폴더가 없으면 생성.
                 storageDir.mkdirs();
 
@@ -396,7 +397,7 @@ public class MainActivity extends AppCompatActivity
             // 기존에 있다면 삭제
             File file = new File(storageDir, filename);
             boolean deleted = file.delete();
-            Log.w(TAG, "Delete Dup Check : " + deleted);
+            Log.d("TAG", "Delete Dup Check : " + deleted);
             FileOutputStream output = null;
 
             try {
@@ -415,10 +416,10 @@ public class MainActivity extends AppCompatActivity
                 }
             }
 
-            Log.e(TAG, "Captured Saved");
+            Log.d("TAG", "Captured Saved");
             Toast.makeText(this, "Capture Saved ", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
-            Log.w(TAG, "Capture Saving Error!", e);
+            Log.d("TAG", "Capture Saving Error!", e);
             Toast.makeText(this, "Save failed", Toast.LENGTH_SHORT).show();
 
         }
