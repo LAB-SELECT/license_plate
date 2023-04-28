@@ -52,7 +52,8 @@ import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.Text;
 import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
+import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions;
+//import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 
 public class MainActivity extends AppCompatActivity
         implements CameraBridgeViewBase.CvCameraViewListener2 {
@@ -87,9 +88,11 @@ public class MainActivity extends AppCompatActivity
     // 모델 정의
     DHDetectionModel detectionModel;
     AlignmentModel alignmentModel;
-    CharModel charModel;
+    //CharModel charModel;
 
-    TextRecognizer recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+    TextRecognizer recognizer = TextRecognition.getClient(new KoreanTextRecognizerOptions.Builder().build());
+
+    //TextRecognizer recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
 
 
     @Override
@@ -136,7 +139,7 @@ public class MainActivity extends AppCompatActivity
             detectionModel = new DHDetectionModel(this, options);
             //Toast.makeText(this.getApplicationContext(), options.toString(), Toast.LENGTH_LONG).show();
             alignmentModel = new AlignmentModel(this, options1);
-            charModel = new CharModel(this, options1);
+            //charModel = new CharModel(this, options1);
 
         }
         catch(IOException e){
@@ -377,6 +380,24 @@ public class MainActivity extends AppCompatActivity
                                             Log.e("텍스트 인식", "실패: " + e.getMessage());
                                         }
                                     });
+            /*Task<Text> result =
+                    recognizer.process(image)
+                            .addOnSuccessListener(new OnSuccessListener<Text>() {
+                                @Override
+                                public void onSuccess(Text visionText) {
+                                    Log.e("텍스트 인식", "성공");
+                                    // Task completed successfully
+                                    String resultText = visionText.getText();
+                                    textView.setText(resultText);
+                                }
+                            })
+                            .addOnFailureListener(
+                                    new OnFailureListener() {
+                                        @Override
+                                        public void onFailure(@NonNull Exception e) {
+                                            Log.e("텍스트 인식", "실패: " + e.getMessage());
+                                        }
+                                    });*/
 
             // char prediction
             long char_s = System.currentTimeMillis();
