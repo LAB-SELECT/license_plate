@@ -2,6 +2,7 @@ package com.carplate.camerax;
 
 
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.annotation.SuppressLint;
@@ -44,6 +45,14 @@ import java.util.List;
 import static android.Manifest.permission.CAMERA;
 
 import com.example.myapplication.R;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.text.Text;
+import com.google.mlkit.vision.text.TextRecognition;
+import com.google.mlkit.vision.text.TextRecognizer;
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 
 public class MainActivity extends AppCompatActivity
         implements CameraBridgeViewBase.CvCameraViewListener2 {
@@ -54,7 +63,6 @@ public class MainActivity extends AppCompatActivity
     private CameraBridgeViewBase m_CameraView;
 
     private static final int CAMERA_PERMISSION_CODE = 200;
-
 
     private Button button; // 카메라 캡쳐버튼
     private Boolean activationButton; // 캡쳐버튼 활성 유무
@@ -80,6 +88,9 @@ public class MainActivity extends AppCompatActivity
     DHDetectionModel detectionModel;
     AlignmentModel alignmentModel;
     CharModel charModel;
+
+    TextRecognizer recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -346,10 +357,31 @@ public class MainActivity extends AppCompatActivity
             onFrame3 = Bitmap.createBitmap(outputImage.cols(), outputImage.rows(), Bitmap.Config.ARGB_8888);
             Utils.matToBitmap(outputImage, onFrame3);
 
+            InputImage image = InputImage.fromBitmap(onFrame3, 0);
+
+            Task<Text> result =
+                    recognizer.process(image)
+                            .addOnSuccessListener(new OnSuccessListener<Text>() {
+                                @Override
+                                public void onSuccess(Text visionText) {
+                                    Log.e("텍스트 인식", "성공");
+                                    // Task completed successfully
+                                    String resultText = visionText.getText();
+                                    textView.setText(resultText);
+                                }
+                            })
+                            .addOnFailureListener(
+                                    new OnFailureListener() {
+                                        @Override
+                                        public void onFailure(@NonNull Exception e) {
+                                            Log.e("텍스트 인식", "실패: " + e.getMessage());
+                                        }
+                                    });
+
             // char prediction
             long char_s = System.currentTimeMillis();
-            String result = charModel.getString(onFrame3);
-            String result2 = result.substring(0,3) + " " + result.substring(3);
+            //String result = charModel.getString(onFrame3);
+            //String result2 = result.substring(0,3) + " " + result.substring(3);
             long char_e = System.currentTimeMillis();
             inferenceTime[2] = char_e-char_s;
             end = System.currentTimeMillis();
@@ -361,7 +393,7 @@ public class MainActivity extends AppCompatActivity
                 public void run() {
                     try {
                         tvTime.setText(infer_result);
-                        textView.setText(result2);
+                        //textView.setText(result2);
                         imageView.setImageBitmap(onFrame3);
                     } catch (Exception e) {
                         e.printStackTrace();
