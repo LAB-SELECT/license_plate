@@ -2,13 +2,19 @@ package com.carplate.camerax;
 
 
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.location.Location;
+import com.google.android.gms.location.LocationRequest;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Looper;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
@@ -16,6 +22,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
@@ -37,13 +44,20 @@ import org.tensorflow.lite.nnapi.NnApiDelegate;
 
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 
 import static android.Manifest.permission.CAMERA;
 
 import com.example.myapplication.R;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.tasks.OnSuccessListener;
 
 public class MainActivity extends AppCompatActivity
         implements CameraBridgeViewBase.CvCameraViewListener2 {
@@ -60,7 +74,8 @@ public class MainActivity extends AppCompatActivity
     private Boolean activationButton; // 캡쳐버튼 활성 유무
     private ImageView imageView; // 시각화
     private Mat matInput;
-    public TextView textView, tvTime; // textView: 번호판 tvTime: 추론시간
+    public TextView textView, tvTime, tvNowTime; // textView: 번호판 tvTime: 추론시간
+    public TextView tvLat, tvLong;
 
     public NnApiDelegate nnApiDelegate = null;
     GpuDelegate delegate = new GpuDelegate();
@@ -81,10 +96,28 @@ public class MainActivity extends AppCompatActivity
     AlignmentModel alignmentModel;
     CharModel charModel;
 
+    // 현재 시간
+    long mNow;
+    Date mDate;
+    SimpleDateFormat mFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+    // gps
+    private FusedLocationProviderClient mFusedLocationProviderClient = null;
+    private Location mLastLocation;
+    private LocationRequest mLocationRequest;
+    private static final int REQUEST_PERMISSION_LOCATION = 10;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Log.d("Permission::","onCreate");
+
+        // gps
+        mLocationRequest = new LocationRequest();
+        mLocationRequest.setInterval(2000);
+        mLocationRequest.setFastestInterval(1000);
+        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        mLocationRequest.setMaxWaitTime(2000);
 
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -98,8 +131,11 @@ public class MainActivity extends AppCompatActivity
         activationButton = false;
         button = (Button) findViewById(R.id.button_capture);
         textView = (TextView) findViewById(R.id.textView);
+        tvLat = (TextView) findViewById(R.id.tvLat);
+        tvLong = (TextView) findViewById(R.id.tvLong);
         imageView = (ImageView) findViewById(R.id.imageView);
-        tvTime = (TextView)findViewById(R.id.tvTime);
+        tvTime = (TextView) findViewById(R.id.tvTime);
+        tvNowTime = (TextView) findViewById(R.id.tvNowTime);
 
         button.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -108,10 +144,13 @@ public class MainActivity extends AppCompatActivity
                     activationButton = true;
                     m_CameraView.enableView();
                     button.setText("중지");
+                    startLocationUpdates();
+
                 } else {
                     activationButton = false;
                     m_CameraView.disableView();
                     button.setText("시작");
+                    stoplocationUpdates();
                 }
             }
         });
@@ -374,5 +413,46 @@ public class MainActivity extends AppCompatActivity
             m_CameraView.enableView();
         }
         return matInput;
+    }
+
+    private String getTime(){
+        mNow = System.currentTimeMillis();
+        mDate = new Date(mNow);
+        return mFormat.format(mDate);
+    }
+
+    protected void startLocationUpdates() {
+        Log.d("TAG", "startLocationUpdates()");
+
+        mFusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this,Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Log.d("TAG", "startLocationUpdates() 두 위치 권한중 하나라도 없는 경우 ");
+            return;
+        }
+        Log.d("TAG", "startLocationUpdates() 위치 권한이 하나라도 존재하는 경우");
+        mFusedLocationProviderClient.requestLocationUpdates(mLocationRequest, mLocationCallback, Looper.myLooper());
+    }
+
+    private LocationCallback mLocationCallback = new LocationCallback() {
+        @Override
+        public void onLocationResult(LocationResult locationResult) {
+            Log.d("TAG", "onLocationResult()");
+            locationResult.getLastLocation();
+            onLocationChanged(locationResult.getLastLocation());
+        }
+    };
+
+    public void onLocationChanged(Location location) {
+        Log.d("TAG", "onLocationChanged()");
+        mLastLocation = location;
+        tvNowTime.setText(getTime());
+        tvLat.setText("위도 : " + mLastLocation.getLatitude());
+        tvLong.setText("경도 : " + mLastLocation.getLongitude());
+    }
+
+    private void stoplocationUpdates() {
+        Log.d("TAG", "stoplocationUpdates()");
+        mFusedLocationProviderClient.removeLocationUpdates(mLocationCallback);
     }
 }

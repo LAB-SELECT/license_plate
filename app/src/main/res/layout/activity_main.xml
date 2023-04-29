@@ -12,10 +12,10 @@
         android:id="@+id/activity_surface_view"
         android:layout_width="577dp"
         android:layout_height="match_parent"
-
         android:layout_alignParentLeft="true"
         android:visibility="visible"
         opencv:camera_id="any" />
+
     <TextView
         android:id="@+id/tvTime"
         android:layout_width="wrap_content"
@@ -28,6 +28,45 @@
         android:layout_marginEnd="30dp"
         android:textColor="@color/red"
         android:layout_marginBottom="20dp"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/tvNowTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_alignParentRight="true"
+        android:background="#00000000"
+        android:text=""
+        android:layout_marginEnd="5dp"
+        android:layout_marginTop="3dp"
+        android:textColor="@color/red"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/tvLat"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_alignParentRight="true"
+        android:background="#00000000"
+        android:text=""
+        android:layout_marginEnd="5dp"
+        android:layout_marginTop="20dp"
+        android:textColor="@color/red"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/tvLong"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_alignParentRight="true"
+        android:background="#00000000"
+        android:text=""
+        android:layout_marginEnd="5dp"
+        android:layout_marginTop="38dp"
+        android:textColor="@color/red"
         android:textSize="18sp" />
 
     <ImageView
