@@ -370,7 +370,8 @@ public class MainActivity extends AppCompatActivity
                                     Log.e("텍스트 인식", "성공");
                                     // Task completed successfully
                                     String resultText = visionText.getText();
-                                    textView.setText(resultText);
+                                    String result2 = resultText.substring(0,3) + " " + resultText.substring(3);
+                                    textView.setText(result2);
                                 }
                             })
                             .addOnFailureListener(
