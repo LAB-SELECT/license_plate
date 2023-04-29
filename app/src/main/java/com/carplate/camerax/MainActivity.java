@@ -1,7 +1,6 @@
 package com.carplate.camerax;
 
 
-
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.annotation.SuppressLint;
@@ -9,6 +8,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Base64;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
@@ -16,7 +16,11 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
@@ -34,16 +38,28 @@ import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.gpu.GpuDelegate;
 import org.tensorflow.lite.nnapi.NnApiDelegate;
 
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+import retrofit2.http.Body;
+import retrofit2.http.Headers;
+import retrofit2.http.POST;
 
-
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import static android.Manifest.permission.CAMERA;
 
 import com.example.myapplication.R;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
 public class MainActivity extends AppCompatActivity
         implements CameraBridgeViewBase.CvCameraViewListener2 {
@@ -68,6 +84,32 @@ public class MainActivity extends AppCompatActivity
     public Interpreter.Options options = (new Interpreter.Options()).addDelegate(delegate);
     public Interpreter.Options options1 = (new Interpreter.Options()).setNumThreads(4);
 
+    public interface OCRService {
+        @Headers({
+                "Content-Type: application/json; charset=utf-8",
+                "X-OCR-SECRET: "
+        })
+        @POST("general")
+        Call<JsonObject> doOCR(@Body JsonObject requestBody);
+    }
+
+    private static final String BASE_URL = "";
+
+    private final Retrofit retrofit = new Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build();
+
+    private final OCRService ocrService = retrofit.create(OCRService.class);
+
+
+    public static String BitmapToString(Bitmap bitmap) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos);
+        byte[] bytes = baos.toByteArray();
+        String temp = Base64.encodeToString(bytes, Base64.DEFAULT);
+        return temp;
+    }
 
     long start,end; // 전체 추론시간
     long[] inferenceTime = new long[3]; // 모델별 추론시간
@@ -79,7 +121,7 @@ public class MainActivity extends AppCompatActivity
     // 모델 정의
     DHDetectionModel detectionModel;
     AlignmentModel alignmentModel;
-    CharModel charModel;
+    //CharModel charModel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -125,7 +167,7 @@ public class MainActivity extends AppCompatActivity
             detectionModel = new DHDetectionModel(this, options);
             //Toast.makeText(this.getApplicationContext(), options.toString(), Toast.LENGTH_LONG).show();
             alignmentModel = new AlignmentModel(this, options1);
-            charModel = new CharModel(this, options1);
+            //charModel = new CharModel(this, options1);
 
         }
         catch(IOException e){
@@ -346,10 +388,67 @@ public class MainActivity extends AppCompatActivity
             onFrame3 = Bitmap.createBitmap(outputImage.cols(), outputImage.rows(), Bitmap.Config.ARGB_8888);
             Utils.matToBitmap(outputImage, onFrame3);
 
+            String carPlate = BitmapToString(onFrame3);
+
+            JsonObject requestBody = new JsonObject();
+            requestBody.addProperty("version", "V2");
+            requestBody.addProperty("requestId", UUID.randomUUID().toString());
+            requestBody.addProperty("timestamp", System.currentTimeMillis());
+
+            JsonObject image = new JsonObject();
+            image.addProperty("format", "png");
+            image.addProperty("data", carPlate);
+            image.addProperty("name", "demo");
+
+            JsonArray images = new JsonArray();
+            images.add(image);
+
+            requestBody.add("images", images);
+            Log.e("json 파일", String.valueOf(requestBody));
+
+            Call<JsonObject> call = ocrService.doOCR(requestBody);
+            call.enqueue(new Callback<JsonObject>() {
+                @Override
+                public void onResponse(Call<JsonObject> call, Response<JsonObject> response) {
+                    String strs="";
+                    if (response.isSuccessful()) {
+                        JsonObject result = response.body();
+                        Log.e("json 파일", String.valueOf(result));
+                        JsonArray imagesArr = result.getAsJsonArray("images");
+                        Log.e("json 파일", String.valueOf(imagesArr));
+                        JsonObject firstImageObj = (JsonObject) imagesArr.get(0);
+                        Log.e("json 파일", String.valueOf(firstImageObj));
+                        JsonArray fieldsArr = firstImageObj.getAsJsonArray("fields");
+                        Log.e("json 파일", String.valueOf(fieldsArr));
+                        for (int i=0; i<fieldsArr.size(); i++){
+                            JsonObject job = (JsonObject) fieldsArr.get(i);
+                            Log.e("json 파일", String.valueOf(job));
+                            strs.concat(String.valueOf(job.get("inferText")));
+                            Log.e("json 파일", String.valueOf(job.get("inferText")));
+                        }
+
+                        String carPlate_num = strs.replaceAll("[^ㄱ-ㅎㅏ-ㅣ가-힣0-9]", "");
+                        textView.setText(carPlate_num);
+                        Toast.makeText(getApplicationContext(), strs, Toast.LENGTH_LONG).show();
+                        Toast.makeText(getApplicationContext(), carPlate_num, Toast.LENGTH_LONG).show();
+                        Log.e("텍스트 인식", "성공");
+
+                    } else {
+                        Log.e("텍스트 인식", "실패");
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<JsonObject> call, Throwable t) {
+                    Log.e("전송", "실패: ");
+                }
+            });
+
+
             // char prediction
             long char_s = System.currentTimeMillis();
-            String result = charModel.getString(onFrame3);
-            String result2 = result.substring(0,3) + " " + result.substring(3);
+            //String result = charModel.getString(onFrame3);
+            //String result2 = result.substring(0,3) + " " + result.substring(3);
             long char_e = System.currentTimeMillis();
             inferenceTime[2] = char_e-char_s;
             end = System.currentTimeMillis();
@@ -361,7 +460,7 @@ public class MainActivity extends AppCompatActivity
                 public void run() {
                     try {
                         tvTime.setText(infer_result);
-                        textView.setText(result2);
+                        //textView.setText(result2);
                         imageView.setImageBitmap(onFrame3);
                     } catch (Exception e) {
                         e.printStackTrace();
