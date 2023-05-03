@@ -9,6 +9,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
@@ -70,6 +71,7 @@ public class MainActivity extends AppCompatActivity
 
 
     long start,end; // 전체 추론시간
+    String result2;
     long[] inferenceTime = new long[3]; // 모델별 추론시간
 
     private Bitmap onFrame; // yolo input
@@ -346,13 +348,21 @@ public class MainActivity extends AppCompatActivity
             onFrame3 = Bitmap.createBitmap(outputImage.cols(), outputImage.rows(), Bitmap.Config.ARGB_8888);
             Utils.matToBitmap(outputImage, onFrame3);
 
-            // char prediction
-            long char_s = System.currentTimeMillis();
-            String result = charModel.getString(onFrame3);
-            String result2 = result.substring(0,3) + " " + result.substring(3);
-            long char_e = System.currentTimeMillis();
-            inferenceTime[2] = char_e-char_s;
-            end = System.currentTimeMillis();
+            Handler handler = new Handler();
+
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    // char prediction
+                    long char_s = System.currentTimeMillis();
+                    String result = charModel.getString(onFrame3);
+                    result2 = result.substring(0,3) + " " + result.substring(3);
+                    long char_e = System.currentTimeMillis();
+                    inferenceTime[2] = char_e-char_s;
+                    end = System.currentTimeMillis();
+                }
+            }, 5000);
+
             double fps = Math.round(((1.0/(end-start))*1000*100.0))/100.0;
             String infer_result = fps + "  fps";
 
