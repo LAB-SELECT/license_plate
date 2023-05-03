@@ -348,6 +348,7 @@ public class MainActivity extends AppCompatActivity
             Imgproc.warpPerspective(toDetImage2, outputImage, M, size2, Imgproc.INTER_CUBIC+ Imgproc.CV_WARP_FILL_OUTLIERS);
             onFrame3 = Bitmap.createBitmap(outputImage.cols(), outputImage.rows(), Bitmap.Config.ARGB_8888);
             Utils.matToBitmap(outputImage, onFrame3);
+            imageView.setImageBitmap(onFrame3);
 
             Handler handler = new Handler(Looper.getMainLooper());
 
@@ -358,11 +359,12 @@ public class MainActivity extends AppCompatActivity
                     long char_s = System.currentTimeMillis();
                     String result = charModel.getString(onFrame3);
                     result2 = result.substring(0,3) + " " + result.substring(3);
+                    textView.setText(result2);
                     long char_e = System.currentTimeMillis();
                     inferenceTime[2] = char_e-char_s;
                     end = System.currentTimeMillis();
                 }
-            }, 5000);
+            }, 2000);
 
             double fps = Math.round(((1.0/(end-start))*1000*100.0))/100.0;
             String infer_result = fps + "  fps";
@@ -372,8 +374,8 @@ public class MainActivity extends AppCompatActivity
                 public void run() {
                     try {
                         tvTime.setText(infer_result);
-                        textView.setText(result2);
-                        imageView.setImageBitmap(onFrame3);
+                        //textView.setText(result2);
+                        //imageView.setImageBitmap(onFrame3);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
