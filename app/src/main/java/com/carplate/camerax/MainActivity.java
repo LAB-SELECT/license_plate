@@ -114,6 +114,8 @@ public class MainActivity extends AppCompatActivity
     }
 
     long start,end; // 전체 추론시간
+    boolean clovaFlag = true;
+    Call<JsonObject> call;
     long[] inferenceTime = new long[3]; // 모델별 추론시간
 
     private Bitmap onFrame; // yolo input
@@ -391,30 +393,34 @@ public class MainActivity extends AppCompatActivity
             onFrame3 = Bitmap.createBitmap(outputImage.cols(), outputImage.rows(), Bitmap.Config.ARGB_8888);
             Utils.matToBitmap(outputImage, onFrame3);
 
-            String carPlate = BitmapToString(onFrame3);
+            if (clovaFlag) {
 
-            JsonObject requestBody = new JsonObject();
-            requestBody.addProperty("version", "V2");
-            requestBody.addProperty("requestId", UUID.randomUUID().toString());
-            requestBody.addProperty("timestamp", System.currentTimeMillis());
+                String carPlate = BitmapToString(onFrame3);
+                imageView.setImageBitmap(onFrame3);
 
-            JsonObject image = new JsonObject();
-            image.addProperty("format", "png");
-            image.addProperty("data", carPlate);
-            image.addProperty("name", "demo");
+                JsonObject requestBody = new JsonObject();
+                requestBody.addProperty("version", "V2");
+                requestBody.addProperty("requestId", UUID.randomUUID().toString());
+                requestBody.addProperty("timestamp", System.currentTimeMillis());
 
-            JsonArray images = new JsonArray();
-            images.add(image);
+                JsonObject image = new JsonObject();
+                image.addProperty("format", "png");
+                image.addProperty("data", carPlate);
+                image.addProperty("name", "demo");
 
-            requestBody.add("images", images);
-            Log.e("json 파일", String.valueOf(requestBody));
+                JsonArray images = new JsonArray();
+                images.add(image);
 
-            Call<JsonObject> call = ocrService.doOCR(requestBody);
+                requestBody.add("images", images);
+                Log.e("json 파일", String.valueOf(requestBody));
+
+                call = ocrService.doOCR(requestBody);
+                clovaFlag = false;
+            }
 
             handler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
-                    imageView.setImageBitmap(onFrame3);
                     call.enqueue(new Callback<JsonObject>() {
                         @Override
                         public void onResponse(Call<JsonObject> call, Response<JsonObject> response) {
@@ -451,6 +457,8 @@ public class MainActivity extends AppCompatActivity
                             Log.e("전송", "실패: ");
                         }
                     });
+
+                    clovaFlag = true;
                 }
             }, 2000);
 
