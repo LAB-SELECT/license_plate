@@ -8,6 +8,8 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Base64;
 import android.util.Log;
 import android.view.SurfaceView;
@@ -279,6 +281,7 @@ public class MainActivity extends AppCompatActivity
         start = System.currentTimeMillis();
         matInput = inputFrame.rgba();
         Mat input = matInput.clone();
+        Handler handler = new Handler(Looper.getMainLooper());
         Log.d("input log:: ","cols: "+input.cols()+" rows: "+input.rows());
 
         if(activationButton){
@@ -407,42 +410,50 @@ public class MainActivity extends AppCompatActivity
             Log.e("json 파일", String.valueOf(requestBody));
 
             Call<JsonObject> call = ocrService.doOCR(requestBody);
-            call.enqueue(new Callback<JsonObject>() {
+
+            handler.postDelayed(new Runnable() {
                 @Override
-                public void onResponse(Call<JsonObject> call, Response<JsonObject> response) {
-                    String strs="";
-                    if (response.isSuccessful()) {
-                        JsonObject result = response.body();
-                        Log.e("json 파일", String.valueOf(result));
-                        JsonArray imagesArr = result.getAsJsonArray("images");
-                        Log.e("json 파일", String.valueOf(imagesArr));
-                        JsonObject firstImageObj = (JsonObject) imagesArr.get(0);
-                        Log.e("json 파일", String.valueOf(firstImageObj));
-                        JsonArray fieldsArr = firstImageObj.getAsJsonArray("fields");
-                        Log.e("json 파일", String.valueOf(fieldsArr));
-                        for (int i=0; i<fieldsArr.size(); i++){
-                            JsonObject job = (JsonObject) fieldsArr.get(i);
-                            Log.e("json 파일", String.valueOf(job));
-                            strs.concat(String.valueOf(job.get("inferText")));
-                            Log.e("json 파일", String.valueOf(job.get("inferText")));
+                public void run() {
+                    imageView.setImageBitmap(onFrame3);
+                    call.enqueue(new Callback<JsonObject>() {
+                        @Override
+                        public void onResponse(Call<JsonObject> call, Response<JsonObject> response) {
+                            String strs="";
+                            if (response.isSuccessful()) {
+                                JsonObject result = response.body();
+                                Log.e("json 파일", String.valueOf(result));
+                                JsonArray imagesArr = result.getAsJsonArray("images");
+                                Log.e("json 파일", String.valueOf(imagesArr));
+                                JsonObject firstImageObj = (JsonObject) imagesArr.get(0);
+                                Log.e("json 파일", String.valueOf(firstImageObj));
+                                JsonArray fieldsArr = firstImageObj.getAsJsonArray("fields");
+                                Log.e("json 파일", String.valueOf(fieldsArr));
+                                for (int i=0; i<fieldsArr.size(); i++){
+                                    JsonObject job = (JsonObject) fieldsArr.get(i);
+                                    Log.e("json 파일", String.valueOf(job));
+                                    strs.concat(String.valueOf(job.get("inferText")));
+                                    Log.e("json 파일", String.valueOf(job.get("inferText")));
+                                }
+
+                                String carPlate_num = strs.replaceAll("[^ㄱ-ㅎㅏ-ㅣ가-힣0-9]", "");
+                                textView.setText(carPlate_num);
+                                Toast.makeText(getApplicationContext(), strs, Toast.LENGTH_LONG).show();
+                                Toast.makeText(getApplicationContext(), carPlate_num, Toast.LENGTH_LONG).show();
+                                Log.e("텍스트 인식", "성공");
+
+                            } else {
+                                Log.e("텍스트 인식", "실패");
+                            }
                         }
 
-                        String carPlate_num = strs.replaceAll("[^ㄱ-ㅎㅏ-ㅣ가-힣0-9]", "");
-                        textView.setText(carPlate_num);
-                        Toast.makeText(getApplicationContext(), strs, Toast.LENGTH_LONG).show();
-                        Toast.makeText(getApplicationContext(), carPlate_num, Toast.LENGTH_LONG).show();
-                        Log.e("텍스트 인식", "성공");
-
-                    } else {
-                        Log.e("텍스트 인식", "실패");
-                    }
+                        @Override
+                        public void onFailure(Call<JsonObject> call, Throwable t) {
+                            Log.e("전송", "실패: ");
+                        }
+                    });
                 }
+            }, 2000);
 
-                @Override
-                public void onFailure(Call<JsonObject> call, Throwable t) {
-                    Log.e("전송", "실패: ");
-                }
-            });
 
 
             // char prediction
@@ -461,7 +472,7 @@ public class MainActivity extends AppCompatActivity
                     try {
                         tvTime.setText(infer_result);
                         //textView.setText(result2);
-                        imageView.setImageBitmap(onFrame3);
+                        //imageView.setImageBitmap(onFrame3);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
