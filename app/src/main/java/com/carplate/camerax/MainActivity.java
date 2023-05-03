@@ -241,6 +241,7 @@ public class MainActivity extends AppCompatActivity
         matInput = inputFrame.rgba();
         Mat input = matInput.clone();
         Log.d("input log:: ","cols: "+input.cols()+" rows: "+input.rows());
+        int cnt = 0;
 
         if(activationButton){
 
@@ -348,6 +349,9 @@ public class MainActivity extends AppCompatActivity
             Imgproc.warpPerspective(toDetImage2, outputImage, M, size2, Imgproc.INTER_CUBIC+ Imgproc.CV_WARP_FILL_OUTLIERS);
             onFrame3 = Bitmap.createBitmap(outputImage.cols(), outputImage.rows(), Bitmap.Config.ARGB_8888);
             Utils.matToBitmap(outputImage, onFrame3);
+            cnt += 1;
+            Log.d("log cnt:: ","cnt: "+cnt);
+
 
             Handler handler = new Handler(Looper.getMainLooper());
 
