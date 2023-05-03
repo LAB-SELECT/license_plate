@@ -10,6 +10,7 @@ import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
@@ -348,7 +349,7 @@ public class MainActivity extends AppCompatActivity
             onFrame3 = Bitmap.createBitmap(outputImage.cols(), outputImage.rows(), Bitmap.Config.ARGB_8888);
             Utils.matToBitmap(outputImage, onFrame3);
 
-            Handler handler = new Handler();
+            Handler handler = new Handler(Looper.getMainLooper());
 
             handler.postDelayed(new Runnable() {
                 @Override
