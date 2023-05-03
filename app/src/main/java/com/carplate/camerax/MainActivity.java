@@ -348,7 +348,6 @@ public class MainActivity extends AppCompatActivity
             Imgproc.warpPerspective(toDetImage2, outputImage, M, size2, Imgproc.INTER_CUBIC+ Imgproc.CV_WARP_FILL_OUTLIERS);
             onFrame3 = Bitmap.createBitmap(outputImage.cols(), outputImage.rows(), Bitmap.Config.ARGB_8888);
             Utils.matToBitmap(outputImage, onFrame3);
-            imageView.setImageBitmap(onFrame3);
 
             Handler handler = new Handler(Looper.getMainLooper());
 
@@ -363,6 +362,7 @@ public class MainActivity extends AppCompatActivity
                     long char_e = System.currentTimeMillis();
                     inferenceTime[2] = char_e-char_s;
                     end = System.currentTimeMillis();
+                    imageView.setImageBitmap(onFrame3);
                 }
             }, 2000);
 
