@@ -94,13 +94,14 @@ public class MainActivity extends AppCompatActivity
     private Bitmap onFrame3; // char input
     private Bitmap onFrame4;
     String onFrame4_base64;
+    String infer_result = "";
 
     String beforePlate = "0";
 
     // 모델 정의
     DHDetectionModel detectionModel;
     AlignmentModel alignmentModel;
-    CharModel charModel;
+    //CharModel charModel;
 
     public interface OCRService {
         @Headers({
@@ -163,7 +164,7 @@ public class MainActivity extends AppCompatActivity
             detectionModel = new DHDetectionModel(this, options);
             //Toast.makeText(this.getApplicationContext(), options.toString(), Toast.LENGTH_LONG).show();
             alignmentModel = new AlignmentModel(this, options1);
-            charModel = new CharModel(this, options1);
+            //charModel = new CharModel(this, options1);
 
         }
         catch(IOException e){
@@ -325,85 +326,92 @@ public class MainActivity extends AppCompatActivity
             int new_w = (int) (pt3_x-pt1_x);
             int new_h = (int) (pt3_y-pt1_y);
 
-            Imgproc.rectangle(matInput, new Point(pt1_x,pt1_y), new Point(pt3_x,pt3_y),
-                    new Scalar(0, 255, 0), 10);
+            if (((pt1_x < 100) || ((pt1_x + new_w) > m_CameraView.getRight() - 100)) || (new_w < 50)) {
+                Log.d("log:: ", "Out of Bound");
+            } else {
 
-            Log.d("log:: ","pt1_x: "+pt1_x+" pt1_y: "+pt1_y+" new_w: "+new_w+" new_h: "+new_h);
+                Imgproc.rectangle(matInput, new Point(pt1_x, pt1_y), new Point(pt3_x, pt3_y),
+                        new Scalar(0, 255, 0), 10);
 
-            Rect roi = new Rect(pt1_x, pt1_y, new_w, new_h);
-            Log.d("log:: ","x: "+roi.x+" y: "+roi.y+" w: "+roi.width+" h: "+roi.height);
-            Log.d("input log:: ","cols: "+input.cols()+" rows: "+input.rows());
-            if(roi.x + roi.width>input.cols() || roi.x<0 || roi.width<0 || roi.y+roi.height>input.rows() || roi.y<0 || roi.height<0)
-                return matInput;
-            Mat croppedImage = new Mat(input, roi);
-            Mat toDetImage2 = new Mat();
-            Size sz2 = new Size(128, 128);
-            Imgproc.resize(croppedImage, toDetImage2, sz2);
-            onFrame2 = Bitmap.createBitmap(toDetImage2.cols(), toDetImage2.rows(), Bitmap.Config.ARGB_8888);
-            Utils.matToBitmap(toDetImage2, onFrame2);
-            Mat toplateImage = new Mat();
-            Size sz3 = new Size(256, 128);
-            Imgproc.resize(croppedImage, toplateImage, sz3);
-            onFrame4 = Bitmap.createBitmap(toplateImage.cols(), toplateImage.rows(), Bitmap.Config.ARGB_8888);
-            Utils.matToBitmap(toplateImage, onFrame4);
+                Log.d("log:: ", "pt1_x: " + pt1_x + " pt1_y: " + pt1_y + " new_w: " + new_w + " new_h: " + new_h);
 
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            onFrame4.compress(Bitmap.CompressFormat.PNG, 100, baos);
-            byte[] bImage = baos.toByteArray();
-            onFrame4_base64 = Base64.encodeToString(bImage, 0);
+                Rect roi = new Rect(pt1_x, pt1_y, new_w, new_h);
+                Log.d("log:: ", "x: " + roi.x + " y: " + roi.y + " w: " + roi.width + " h: " + roi.height);
+                Log.d("input log:: ", "cols: " + input.cols() + " rows: " + input.rows());
+                if (roi.x + roi.width > input.cols() || roi.x < 0 || roi.width < 0 || roi.y + roi.height > input.rows() || roi.y < 0 || roi.height < 0)
+                    return matInput;
+                Mat croppedImage = new Mat(input, roi);
+                Mat toDetImage2 = new Mat();
+                Size sz2 = new Size(128, 128);
+                Imgproc.resize(croppedImage, toDetImage2, sz2);
+                onFrame2 = Bitmap.createBitmap(toDetImage2.cols(), toDetImage2.rows(), Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(toDetImage2, onFrame2);
+                Mat toplateImage = new Mat();
+                Size sz3 = new Size(256, 128);
+                Imgproc.resize(croppedImage, toplateImage, sz3);
+                onFrame4 = Bitmap.createBitmap(toplateImage.cols(), toplateImage.rows(), Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(toplateImage, onFrame4);
 
-            long align_s = System.currentTimeMillis();
-            float[] coord2 = alignmentModel.getCoordinate(onFrame2);
-            long align_e = System.currentTimeMillis();
-            inferenceTime[1] = align_e-align_s;
-            float[] new_coord2 = new float[8];
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                onFrame4.compress(Bitmap.CompressFormat.PNG, 100, baos);
+                byte[] bImage = baos.toByteArray();
+                onFrame4_base64 = Base64.encodeToString(bImage, 0);
 
-            // sigmoid
-            for(int i=0;i<8;i++){
-                new_coord2[i] = (float) (Math.exp(-(coord2[i]))+1);
-                new_coord2[i] = 1/new_coord2[i];
-                new_coord2[i] = new_coord2[i]*128;
+                long align_s = System.currentTimeMillis();
+                float[] coord2 = alignmentModel.getCoordinate(onFrame2);
+                long align_e = System.currentTimeMillis();
+                inferenceTime[1] = align_e - align_s;
+                float[] new_coord2 = new float[8];
+
+                // sigmoid
+                for (int i = 0; i < 8; i++) {
+                    new_coord2[i] = (float) (Math.exp(-(coord2[i])) + 1);
+                    new_coord2[i] = 1 / new_coord2[i];
+                    new_coord2[i] = new_coord2[i] * 128;
+                }
+
+                // perspective transformation
+                Mat outputImage = new Mat(256, 128, CvType.CV_8UC3);
+                List<Point> src_pnt = new ArrayList<Point>();
+
+                Point p0 = new Point(new_coord2[0], new_coord2[1]);
+                Point p1 = new Point(new_coord2[2], new_coord2[3]);
+                Point p2 = new Point(new_coord2[4], new_coord2[5]);
+                Point p3 = new Point(new_coord2[6], new_coord2[7]);
+
+                src_pnt.add(p0);
+                src_pnt.add(p1);
+                src_pnt.add(p2);
+                src_pnt.add(p3);
+
+                Mat startM = Converters.vector_Point2f_to_Mat(src_pnt);
+                List<Point> dst_pnt = new ArrayList<Point>();
+                Point p4 = new Point(0, 0);
+                Point p5 = new Point(255, 0);
+                Point p6 = new Point(255, 127);
+                Point p7 = new Point(0, 127);
+                dst_pnt.add(p4);
+                dst_pnt.add(p5);
+                dst_pnt.add(p6);
+                dst_pnt.add(p7);
+                Mat endM = Converters.vector_Point2f_to_Mat(dst_pnt);
+                Mat M = Imgproc.getPerspectiveTransform(startM, endM);
+                Size size2 = new Size(256, 128);
+                Imgproc.warpPerspective(toDetImage2, outputImage, M, size2, Imgproc.INTER_CUBIC + Imgproc.CV_WARP_FILL_OUTLIERS);
+                onFrame3 = Bitmap.createBitmap(outputImage.cols(), outputImage.rows(), Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(outputImage, onFrame3);
+
+
+                // char prediction
+                long char_s = System.currentTimeMillis();
+                //String result = charModel.getString(onFrame3);
+                //String result2 = result.substring(0,3) + " " + result.substring(3);
+                long char_e = System.currentTimeMillis();
+                inferenceTime[2] = char_e - char_s;
+                end = System.currentTimeMillis();
+                double fps = Math.round(((1.0 / (end - start)) * 1000 * 100.0)) / 100.0;
+                infer_result = fps + "  fps";
             }
-
-            // perspective transformation
-            Mat outputImage = new Mat(256, 128, CvType.CV_8UC3);
-            List<Point> src_pnt = new ArrayList<Point>();
-
-            Point p0 = new Point(new_coord2[0], new_coord2[1]);        Point p1 = new Point(new_coord2[2], new_coord2[3]);
-            Point p2 = new Point(new_coord2[4], new_coord2[5]);        Point p3 = new Point(new_coord2[6], new_coord2[7]);
-
-            src_pnt.add(p0);
-            src_pnt.add(p1);
-            src_pnt.add(p2);
-            src_pnt.add(p3);
-
-            Mat startM = Converters.vector_Point2f_to_Mat(src_pnt);
-            List<Point> dst_pnt = new ArrayList<Point>();
-            Point p4 = new Point(0, 0);
-            Point p5 = new Point(255, 0);
-            Point p6 = new Point(255, 127);
-            Point p7 = new Point(0, 127);
-            dst_pnt.add(p4);
-            dst_pnt.add(p5);
-            dst_pnt.add(p6);
-            dst_pnt.add(p7);
-            Mat endM = Converters.vector_Point2f_to_Mat(dst_pnt);
-            Mat M = Imgproc.getPerspectiveTransform(startM, endM);
-            Size size2 = new Size(256, 128);
-            Imgproc.warpPerspective(toDetImage2, outputImage, M, size2, Imgproc.INTER_CUBIC+ Imgproc.CV_WARP_FILL_OUTLIERS);
-            onFrame3 = Bitmap.createBitmap(outputImage.cols(), outputImage.rows(), Bitmap.Config.ARGB_8888);
-            Utils.matToBitmap(outputImage, onFrame3);
-
-
-            // char prediction
-            long char_s = System.currentTimeMillis();
-            //String result = charModel.getString(onFrame3);
-            //String result2 = result.substring(0,3) + " " + result.substring(3);
-            long char_e = System.currentTimeMillis();
-            inferenceTime[2] = char_e-char_s;
-            end = System.currentTimeMillis();
-            double fps = Math.round(((1.0/(end-start))*1000*100.0))/100.0;
-            String infer_result = fps + "  fps";
 
             runOnUiThread(new Runnable() {
                 @Override
