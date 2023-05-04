@@ -511,11 +511,13 @@ public class MainActivity extends AppCompatActivity
                         Log.e("텍스트 인식", "실패");
                     }
                     cFlag = true;
+                    Log.e("json 파일", String.valueOf(cFlag));
                 }
                 @Override
                 public void onFailure(Call<JsonObject> call, Throwable t) {
                     Log.e("전송", "실패: ");
                     cFlag = false;
+                    Log.e("json 파일", String.valueOf(cFlag));
                 }
             });
         }
