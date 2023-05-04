@@ -395,8 +395,8 @@ public class MainActivity extends AppCompatActivity
                 public void run() {
                     try {
                         tvTime.setText(infer_result);
-                        imageView.setImageBitmap(onFrame3);
-                        String img_url = saveImg(onFrame3, "test");
+                        imageView.setImageBitmap(onFrame2);
+                        String img_url = saveImg(onFrame2, "test");
                         Log.e("img_url 파일", img_url);
                         carPlate_num(img_url);
                     } catch (Exception e) {
