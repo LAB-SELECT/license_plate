@@ -82,7 +82,7 @@ public class MainActivity extends AppCompatActivity
 
 
     long start,end; // 전체 추론시간
-    boolean clovaFlag = true;
+    boolean cFlag;
     Call<JsonObject> call;
     long[] inferenceTime = new long[3]; // 모델별 추론시간
 
@@ -459,14 +459,14 @@ public class MainActivity extends AppCompatActivity
     }
 
     private void carPlate_num (String img_url) {
-        if (clovaFlag) {
+        if (cFlag) {
             JsonObject requestBody = new JsonObject();
             requestBody.addProperty("version", "V2");
             requestBody.addProperty("requestId", UUID.randomUUID().toString());
             requestBody.addProperty("timestamp", System.currentTimeMillis());
 
             JsonObject image = new JsonObject();
-            image.addProperty("format", "png");
+            image.addProperty("format", "jpg");
             image.addProperty("url", img_url);
             image.addProperty("name", "carPlate");
 
@@ -477,7 +477,7 @@ public class MainActivity extends AppCompatActivity
             Log.e("json 파일", String.valueOf(requestBody));
 
             call = ocrService.doOCR(requestBody);
-            clovaFlag = false;
+            cFlag = false;
         } else {
             call.enqueue(new Callback<JsonObject>() {
                 @Override
@@ -508,12 +508,12 @@ public class MainActivity extends AppCompatActivity
                     } else {
                         Log.e("텍스트 인식", "실패");
                     }
-                    clovaFlag = true;
+                    cFlag = true;
                 }
                 @Override
                 public void onFailure(Call<JsonObject> call, Throwable t) {
                     Log.e("전송", "실패: ");
-                    clovaFlag = false;
+                    cFlag = false;
                 }
             });
         }
