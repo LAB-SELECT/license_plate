@@ -82,7 +82,7 @@ public class MainActivity extends AppCompatActivity
 
 
     long start,end; // 전체 추론시간
-    boolean cFlag;
+    boolean cFlag=true;
     Call<JsonObject> call;
     long[] inferenceTime = new long[3]; // 모델별 추론시간
 
@@ -100,12 +100,12 @@ public class MainActivity extends AppCompatActivity
     public interface OCRService {
         @Headers({
                 "Content-Type: application/json; charset=utf-8",
-                "X-OCR-SECRET: "
+                "X-OCR-SECRET: SGpjcWNEVUROSnRnaHpJcWNreFZtaVlLYWVJRXloZ3Q="
         })
         @POST("general")
         Call<JsonObject> doOCR(@Body JsonObject requestBody);
     }
-    private static final String BASE_URL = "";
+    private static final String BASE_URL = "https://k3jyg1t7lb.apigw.ntruss.com/custom/v1/21307/d6c07e9b3b323a6498af50bc24fc0211e8acd512b02e7df2899181011329a6c7/";
 
     private final Retrofit retrofit = new Retrofit.Builder()
             .baseUrl(BASE_URL)
@@ -411,7 +411,7 @@ public class MainActivity extends AppCompatActivity
         return matInput;
     }
 
-    private String saveImg(Bitmap bitmap, String textview) {
+    private String saveImg(Bitmap bitmap, String text) {
         String dir_path = "";
         String filename = "";
 
@@ -421,7 +421,7 @@ public class MainActivity extends AppCompatActivity
             if (!storageDir.exists()) //폴더가 없으면 생성.
                 storageDir.mkdirs();
 
-            filename =  textView.getText().toString() + ".jpg";
+            filename =  text + ".jpg";
             dir_path = storageDir.toString();
 
             // 기존에 있다면 삭제
@@ -447,7 +447,7 @@ public class MainActivity extends AppCompatActivity
             }
 
             Log.d("TAG", "Captured Saved");
-            Toast.makeText(this, "Capture Saved ", Toast.LENGTH_SHORT).show();
+//            Toast.makeText(this, "Capture Saved ", Toast.LENGTH_SHORT).show();
 
             Log.e("filepath", storageDir.toString() +'/' + filename);
 
@@ -479,6 +479,7 @@ public class MainActivity extends AppCompatActivity
 
             call = ocrService.doOCR(requestBody);
             cFlag = false;
+            Log.e("json 파일", String.valueOf(cFlag));
         } else {
             call.enqueue(new Callback<JsonObject>() {
                 @Override
