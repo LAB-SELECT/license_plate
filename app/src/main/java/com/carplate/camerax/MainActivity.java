@@ -7,8 +7,10 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.annotation.SuppressLint;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Base64;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
@@ -44,6 +46,7 @@ import retrofit2.http.Body;
 import retrofit2.http.Headers;
 import retrofit2.http.POST;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -89,6 +92,8 @@ public class MainActivity extends AppCompatActivity
     private Bitmap onFrame; // yolo input
     private Bitmap onFrame2; // alignment input
     private Bitmap onFrame3; // char input
+    private Bitmap onFrame4;
+    String onFrame4_base64;
 
     String beforePlate = "0";
 
@@ -336,6 +341,16 @@ public class MainActivity extends AppCompatActivity
             Imgproc.resize(croppedImage, toDetImage2, sz2);
             onFrame2 = Bitmap.createBitmap(toDetImage2.cols(), toDetImage2.rows(), Bitmap.Config.ARGB_8888);
             Utils.matToBitmap(toDetImage2, onFrame2);
+            Mat toplateImage = new Mat();
+            Size sz3 = new Size(256, 128);
+            Imgproc.resize(croppedImage, toplateImage, sz3);
+            onFrame4 = Bitmap.createBitmap(toplateImage.cols(), toplateImage.rows(), Bitmap.Config.ARGB_8888);
+            Utils.matToBitmap(toplateImage, onFrame4);
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            onFrame4.compress(Bitmap.CompressFormat.PNG, 100, baos);
+            byte[] bImage = baos.toByteArray();
+            onFrame4_base64 = Base64.encodeToString(bImage, 0);
 
             long align_s = System.currentTimeMillis();
             float[] coord2 = alignmentModel.getCoordinate(onFrame2);
@@ -395,10 +410,8 @@ public class MainActivity extends AppCompatActivity
                 public void run() {
                     try {
                         tvTime.setText(infer_result);
-                        imageView.setImageBitmap(onFrame2);
-                        String img_url = saveImg(onFrame2, "test");
-                        Log.e("img_url 파일", img_url);
-                        carPlate_num(img_url);
+                        imageView.setImageBitmap(onFrame4);
+                        carPlate_num(onFrame4_base64);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -411,9 +424,7 @@ public class MainActivity extends AppCompatActivity
         return matInput;
     }
 
-    private String saveImg(Bitmap bitmap, String text) {
-        String dir_path = "";
-        String filename = "";
+    private void saveImg(Bitmap bitmap, String textview) {
 
         try {
             //저장할 파일 경로
@@ -421,8 +432,7 @@ public class MainActivity extends AppCompatActivity
             if (!storageDir.exists()) //폴더가 없으면 생성.
                 storageDir.mkdirs();
 
-            filename =  text + ".jpg";
-            dir_path = storageDir.toString();
+            String filename =  textView.getText().toString() + ".jpg";
 
             // 기존에 있다면 삭제
             File file = new File(storageDir, filename);
@@ -447,19 +457,15 @@ public class MainActivity extends AppCompatActivity
             }
 
             Log.d("TAG", "Captured Saved");
-//            Toast.makeText(this, "Capture Saved ", Toast.LENGTH_SHORT).show();
-
-            Log.e("filepath", storageDir.toString() +'/' + filename);
-
+            Toast.makeText(this, "Capture Saved ", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             Log.d("TAG", "Capture Saving Error!", e);
             Toast.makeText(this, "Save failed", Toast.LENGTH_SHORT).show();
 
         }
-        return dir_path +'/' + filename;
     }
 
-    private void carPlate_num (String img_url) {
+    private void carPlate_num (String onFrame4) {
         if (cFlag) {
             JsonObject requestBody = new JsonObject();
             requestBody.addProperty("version", "V2");
@@ -467,15 +473,15 @@ public class MainActivity extends AppCompatActivity
             requestBody.addProperty("timestamp", System.currentTimeMillis());
 
             JsonObject image = new JsonObject();
-            image.addProperty("format", "jpg");
-            image.addProperty("url", img_url);
+            image.addProperty("format", "png");
             image.addProperty("name", "carPlate");
+            image.addProperty("data", onFrame4);
 
             JsonArray images = new JsonArray();
             images.add(image);
 
             requestBody.add("images", images);
-            Log.e("json 파일", String.valueOf(requestBody));
+            //Log.e("json 파일", String.valueOf(requestBody));
 
             call = ocrService.doOCR(requestBody);
             cFlag = false;
@@ -487,24 +493,25 @@ public class MainActivity extends AppCompatActivity
                     String strs="";
                     if (response.isSuccessful()) {
                         JsonObject result = response.body();
-                        Log.e("json 파일", String.valueOf(result));
+                        //Log.e("json 파일", String.valueOf(result));
                         JsonArray imagesArr = result.getAsJsonArray("images");
-                        Log.e("json 파일", String.valueOf(imagesArr));
+                        //Log.e("json 파일", String.valueOf(imagesArr));
                         JsonObject firstImageObj = (JsonObject) imagesArr.get(0);
-                        Log.e("json 파일", String.valueOf(firstImageObj));
+                        //Log.e("json 파일", String.valueOf(firstImageObj));
                         JsonArray fieldsArr = firstImageObj.getAsJsonArray("fields");
-                        Log.e("json 파일", String.valueOf(fieldsArr));
+                        //Log.e("json 파일", String.valueOf(fieldsArr));
                         for (int i=0; i<fieldsArr.size(); i++){
                             JsonObject job = (JsonObject) fieldsArr.get(i);
-                            Log.e("json 파일", String.valueOf(job));
-                            strs.concat(String.valueOf(job.get("inferText")));
-                            Log.e("json 파일", String.valueOf(job.get("inferText")));
+                            //Log.e("json 파일", String.valueOf(job));
+                            strs = strs + job.get("inferText");
+                            //.e("json 파일", String.valueOf(job.get("inferText")));
                         }
+                        //Log.e("json 파일", strs);
 
                         String carPlate_num = strs.replaceAll("[^ㄱ-ㅎㅏ-ㅣ가-힣0-9]", "");
                         textView.setText(carPlate_num);
-                        Toast.makeText(getApplicationContext(), strs, Toast.LENGTH_LONG).show();
-                        Toast.makeText(getApplicationContext(), carPlate_num, Toast.LENGTH_LONG).show();
+                        //Toast.makeText(getApplicationContext(), strs, Toast.LENGTH_LONG).show();
+                        //Toast.makeText(getApplicationContext(), carPlate_num, Toast.LENGTH_LONG).show();
                         Log.e("텍스트 인식", "성공");
 
                     } else {
