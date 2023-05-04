@@ -1,7 +1,5 @@
 package com.carplate.camerax;
 
-import com.db.ConnectDB;
-
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.annotation.SuppressLint;
@@ -16,6 +14,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
@@ -35,6 +34,9 @@ import org.tensorflow.lite.gpu.GpuDelegate;
 import org.tensorflow.lite.nnapi.NnApiDelegate;
 
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -368,9 +370,14 @@ public class MainActivity extends AppCompatActivity
                             imageView.setImageBitmap(onFrame3);
                             beforePlate = result2;
                             saveImg(onFrame3, result2);
-                            ConnectDB connectDB = ConnectDB().getInstance();
-                            String checkDB = connectDB.connectionDB(result2);
-                            Toast.makeText(this, checkDB, Toast.LENGTH_SHORT).show();
+                            DBHelper dbHelper = new DBHelper(MainActivity.this, 1);
+                            //String checkDB = connectDB.connectionDB(result2);
+
+                            if(dbHelper.getResult(result2)) {
+                                Toast.makeText(MainActivity.this, "exist", Toast.LENGTH_SHORT).show();
+                            }else{
+                                Toast.makeText(MainActivity.this, "no exist", Toast.LENGTH_SHORT).show();
+                            }
 
                         } catch (Exception e) {
                             e.printStackTrace();
@@ -390,7 +397,7 @@ public class MainActivity extends AppCompatActivity
 
         try {
             //저장할 파일 경로
-            File storageDir = new File(getExternalFilesDir() + "/capture");
+            File storageDir = new File(getFilesDir() + "/capture");
             if (!storageDir.exists()) //폴더가 없으면 생성.
                 storageDir.mkdirs();
 

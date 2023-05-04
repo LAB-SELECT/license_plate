@@ -1,9 +1,4 @@
-package com.db;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+package com.carplate.camerax;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -56,17 +51,17 @@ public class DBHelper extends SQLiteOpenHelper {
      */
 
     // Person Table 조회
-    public String getResult(String carNum) {
+    public boolean getResult(String carNum) {
         // 읽기가 가능하게 DB 열기
         SQLiteDatabase db = getReadableDatabase();
 
         // DB에 있는 데이터를 쉽게 처리하기 위해 Cursor를 사용하여 테이블에 있는 모든 데이터 출력
-        Cursor cursor = db.rawQuery("SELECT * FROM ExistCar WHERE carNum = ?", carNum);
+        Cursor cursor = db.rawQuery("SELECT * FROM ExistCar WHERE carNum = ?", new String[] {carNum});
         while (cursor.moveToNext()) {
-            return 1;
+            return true;
         }
 
-        return 0;
+        return false;
     }
 }
 
