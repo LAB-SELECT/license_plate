@@ -52,6 +52,7 @@ public class DBHelper extends SQLiteOpenHelper {
         db.execSQL("DELETE Person WHERE NAME = '" + name + "'");
         db.close();
     }
+
      */
 
     // Person Table 조회
