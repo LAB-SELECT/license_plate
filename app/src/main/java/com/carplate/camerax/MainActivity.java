@@ -114,13 +114,15 @@ public class MainActivity extends AppCompatActivity
     }
 
     long start,end; // 전체 추론시간
-    boolean clovaFlag = true;
+    boolean cFlag=true;
     Call<JsonObject> call;
     long[] inferenceTime = new long[3]; // 모델별 추론시간
 
     private Bitmap onFrame; // yolo input
     private Bitmap onFrame2; // alignment input
     private Bitmap onFrame3; // char input
+    private Bitmap onFrame4;
+    String onFrame4_base64;
 
     // 모델 정의
     DHDetectionModel detectionModel;
@@ -350,6 +352,16 @@ public class MainActivity extends AppCompatActivity
             Imgproc.resize(croppedImage, toDetImage2, sz2);
             onFrame2 = Bitmap.createBitmap(toDetImage2.cols(), toDetImage2.rows(), Bitmap.Config.ARGB_8888);
             Utils.matToBitmap(toDetImage2, onFrame2);
+            Mat toplateImage = new Mat();
+            Size sz3 = new Size(256, 128);
+            Imgproc.resize(croppedImage, toplateImage, sz3);
+            onFrame4 = Bitmap.createBitmap(toplateImage.cols(), toplateImage.rows(), Bitmap.Config.ARGB_8888);
+            Utils.matToBitmap(toplateImage, onFrame4);
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            onFrame4.compress(Bitmap.CompressFormat.PNG, 100, baos);
+            byte[] bImage = baos.toByteArray();
+            onFrame4_base64 = Base64.encodeToString(bImage, 0);
 
             long align_s = System.currentTimeMillis();
             float[] coord2 = alignmentModel.getCoordinate(onFrame2);
@@ -393,77 +405,6 @@ public class MainActivity extends AppCompatActivity
             onFrame3 = Bitmap.createBitmap(outputImage.cols(), outputImage.rows(), Bitmap.Config.ARGB_8888);
             Utils.matToBitmap(outputImage, onFrame3);
 
-            if (clovaFlag) {
-
-                String carPlate = BitmapToString(onFrame3);
-                imageView.setImageBitmap(onFrame3);
-
-                JsonObject requestBody = new JsonObject();
-                requestBody.addProperty("version", "V2");
-                requestBody.addProperty("requestId", UUID.randomUUID().toString());
-                requestBody.addProperty("timestamp", System.currentTimeMillis());
-
-                JsonObject image = new JsonObject();
-                image.addProperty("format", "png");
-                image.addProperty("data", carPlate);
-                image.addProperty("name", "demo");
-
-                JsonArray images = new JsonArray();
-                images.add(image);
-
-                requestBody.add("images", images);
-                Log.e("json 파일", String.valueOf(requestBody));
-
-                call = ocrService.doOCR(requestBody);
-                clovaFlag = false;
-            }
-
-            handler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    call.enqueue(new Callback<JsonObject>() {
-                        @Override
-                        public void onResponse(Call<JsonObject> call, Response<JsonObject> response) {
-                            String strs="";
-                            if (response.isSuccessful()) {
-                                JsonObject result = response.body();
-                                Log.e("json 파일", String.valueOf(result));
-                                JsonArray imagesArr = result.getAsJsonArray("images");
-                                Log.e("json 파일", String.valueOf(imagesArr));
-                                JsonObject firstImageObj = (JsonObject) imagesArr.get(0);
-                                Log.e("json 파일", String.valueOf(firstImageObj));
-                                JsonArray fieldsArr = firstImageObj.getAsJsonArray("fields");
-                                Log.e("json 파일", String.valueOf(fieldsArr));
-                                for (int i=0; i<fieldsArr.size(); i++){
-                                    JsonObject job = (JsonObject) fieldsArr.get(i);
-                                    Log.e("json 파일", String.valueOf(job));
-                                    strs.concat(String.valueOf(job.get("inferText")));
-                                    Log.e("json 파일", String.valueOf(job.get("inferText")));
-                                }
-
-                                String carPlate_num = strs.replaceAll("[^ㄱ-ㅎㅏ-ㅣ가-힣0-9]", "");
-                                textView.setText(carPlate_num);
-                                Toast.makeText(getApplicationContext(), strs, Toast.LENGTH_LONG).show();
-                                Toast.makeText(getApplicationContext(), carPlate_num, Toast.LENGTH_LONG).show();
-                                Log.e("텍스트 인식", "성공");
-
-                            } else {
-                                Log.e("텍스트 인식", "실패");
-                            }
-                        }
-
-                        @Override
-                        public void onFailure(Call<JsonObject> call, Throwable t) {
-                            Log.e("전송", "실패: ");
-                        }
-                    });
-
-                    clovaFlag = true;
-                }
-            }, 2000);
-
-
-
             // char prediction
             long char_s = System.currentTimeMillis();
             //String result = charModel.getString(onFrame3);
@@ -479,8 +420,8 @@ public class MainActivity extends AppCompatActivity
                 public void run() {
                     try {
                         tvTime.setText(infer_result);
-                        //textView.setText(result2);
-                        //imageView.setImageBitmap(onFrame3);
+                        imageView.setImageBitmap(onFrame4);
+                        carPlate_num(onFrame4_base64);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -492,5 +433,69 @@ public class MainActivity extends AppCompatActivity
             m_CameraView.enableView();
         }
         return matInput;
+    }
+    private void carPlate_num (String onFrame4) {
+        if (cFlag) {
+            JsonObject requestBody = new JsonObject();
+            requestBody.addProperty("version", "V2");
+            requestBody.addProperty("requestId", UUID.randomUUID().toString());
+            requestBody.addProperty("timestamp", System.currentTimeMillis());
+
+            JsonObject image = new JsonObject();
+            image.addProperty("format", "png");
+            image.addProperty("name", "carPlate");
+            image.addProperty("data", onFrame4);
+
+            JsonArray images = new JsonArray();
+            images.add(image);
+
+            requestBody.add("images", images);
+            //Log.e("json 파일", String.valueOf(requestBody));
+
+            call = ocrService.doOCR(requestBody);
+            cFlag = false;
+            Log.e("json 파일", String.valueOf(cFlag));
+        } else {
+            call.enqueue(new Callback<JsonObject>() {
+                @Override
+                public void onResponse(Call<JsonObject> call, Response<JsonObject> response) {
+                    String strs="";
+                    if (response.isSuccessful()) {
+                        JsonObject result = response.body();
+                        //Log.e("json 파일", String.valueOf(result));
+                        JsonArray imagesArr = result.getAsJsonArray("images");
+                        //Log.e("json 파일", String.valueOf(imagesArr));
+                        JsonObject firstImageObj = (JsonObject) imagesArr.get(0);
+                        //Log.e("json 파일", String.valueOf(firstImageObj));
+                        JsonArray fieldsArr = firstImageObj.getAsJsonArray("fields");
+                        //Log.e("json 파일", String.valueOf(fieldsArr));
+                        for (int i=0; i<fieldsArr.size(); i++){
+                            JsonObject job = (JsonObject) fieldsArr.get(i);
+                            //Log.e("json 파일", String.valueOf(job));
+                            strs = strs + job.get("inferText");
+                            //.e("json 파일", String.valueOf(job.get("inferText")));
+                        }
+                        //Log.e("json 파일", strs);
+
+                        String carPlate_num = strs.replaceAll("[^ㄱ-ㅎㅏ-ㅣ가-힣0-9]", "");
+                        textView.setText(carPlate_num);
+                        //Toast.makeText(getApplicationContext(), strs, Toast.LENGTH_LONG).show();
+                        //Toast.makeText(getApplicationContext(), carPlate_num, Toast.LENGTH_LONG).show();
+                        Log.e("텍스트 인식", "성공");
+
+                    } else {
+                        Log.e("텍스트 인식", "실패");
+                    }
+                    cFlag = true;
+                    Log.e("json 파일", String.valueOf(cFlag));
+                }
+                @Override
+                public void onFailure(Call<JsonObject> call, Throwable t) {
+                    Log.e("전송", "실패: ");
+                    cFlag = false;
+                    Log.e("json 파일", String.valueOf(cFlag));
+                }
+            });
+        }
     }
 }
