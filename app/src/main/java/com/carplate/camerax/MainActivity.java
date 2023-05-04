@@ -16,6 +16,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
@@ -34,15 +35,29 @@ import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.gpu.GpuDelegate;
 import org.tensorflow.lite.nnapi.NnApiDelegate;
 
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+import retrofit2.http.Body;
+import retrofit2.http.Headers;
+import retrofit2.http.POST;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import static android.Manifest.permission.CAMERA;
 
 import com.example.myapplication.R;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 
 public class MainActivity extends AppCompatActivity
         implements CameraBridgeViewBase.CvCameraViewListener2 {
@@ -69,6 +84,8 @@ public class MainActivity extends AppCompatActivity
 
 
     long start,end; // 전체 추론시간
+    boolean clovaFlag = true;
+    Call<JsonObject> call;
     long[] inferenceTime = new long[3]; // 모델별 추론시간
 
     private Bitmap onFrame; // yolo input
@@ -81,6 +98,23 @@ public class MainActivity extends AppCompatActivity
     DHDetectionModel detectionModel;
     AlignmentModel alignmentModel;
     CharModel charModel;
+
+    public interface OCRService {
+        @Headers({
+                "Content-Type: application/json; charset=utf-8",
+                "X-OCR-SECRET: "
+        })
+        @POST("general")
+        Call<JsonObject> doOCR(@Body JsonObject requestBody);
+    }
+    private static final String BASE_URL = "";
+
+    private final Retrofit retrofit = new Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build();
+
+    private final OCRService ocrService = retrofit.create(OCRService.class);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -367,11 +401,69 @@ public class MainActivity extends AppCompatActivity
                             textView.setText(result2);
                             imageView.setImageBitmap(onFrame3);
                             beforePlate = result2;
-                            saveImg(onFrame3, result2);
-                            ConnectDB connectDB = ConnectDB().getInstance();
-                            String checkDB = connectDB.connectionDB(result2);
-                            Toast.makeText(this, checkDB, Toast.LENGTH_SHORT).show();
+                            String img_url = saveImg(onFrame3, result2);
 
+                            if (clovaFlag) {
+
+                                //String carPlate = BitmapToString(onFrame3);
+                                //imageView.setImageBitmap(onFrame3);
+
+                                JsonObject requestBody = new JsonObject();
+                                requestBody.addProperty("version", "V2");
+                                requestBody.addProperty("requestId", UUID.randomUUID().toString());
+                                requestBody.addProperty("timestamp", System.currentTimeMillis());
+
+                                JsonObject image = new JsonObject();
+                                image.addProperty("format", "png");
+                                image.addProperty("url", img_url);
+                                image.addProperty("name", "carPlate");
+
+                                JsonArray images = new JsonArray();
+                                images.add(image);
+
+                                requestBody.add("images", images);
+                                Log.e("json 파일", String.valueOf(requestBody));
+
+                                call = ocrService.doOCR(requestBody);
+                                clovaFlag = false;
+                            } else {
+                                call.enqueue(new Callback<JsonObject>() {
+                                    @Override
+                                    public void onResponse(Call<JsonObject> call, Response<JsonObject> response) {
+                                        String strs="";
+                                        if (response.isSuccessful()) {
+                                            JsonObject result = response.body();
+                                            Log.e("json 파일", String.valueOf(result));
+                                            JsonArray imagesArr = result.getAsJsonArray("images");
+                                            Log.e("json 파일", String.valueOf(imagesArr));
+                                            JsonObject firstImageObj = (JsonObject) imagesArr.get(0);
+                                            Log.e("json 파일", String.valueOf(firstImageObj));
+                                            JsonArray fieldsArr = firstImageObj.getAsJsonArray("fields");
+                                            Log.e("json 파일", String.valueOf(fieldsArr));
+                                            for (int i=0; i<fieldsArr.size(); i++){
+                                                JsonObject job = (JsonObject) fieldsArr.get(i);
+                                                Log.e("json 파일", String.valueOf(job));
+                                                strs.concat(String.valueOf(job.get("inferText")));
+                                                Log.e("json 파일", String.valueOf(job.get("inferText")));
+                                            }
+
+                                            String carPlate_num = strs.replaceAll("[^ㄱ-ㅎㅏ-ㅣ가-힣0-9]", "");
+                                            textView.setText(carPlate_num);
+                                            Toast.makeText(getApplicationContext(), strs, Toast.LENGTH_LONG).show();
+                                            Toast.makeText(getApplicationContext(), carPlate_num, Toast.LENGTH_LONG).show();
+                                            Log.e("텍스트 인식", "성공");
+
+                                        } else {
+                                            Log.e("텍스트 인식", "실패");
+                                        }
+                                    }
+                                    @Override
+                                    public void onFailure(Call<JsonObject> call, Throwable t) {
+                                        Log.e("전송", "실패: ");
+                                    }
+                                });
+                                clovaFlag = true;
+                            }
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
@@ -380,21 +472,23 @@ public class MainActivity extends AppCompatActivity
             }
         }
         else{
-
             m_CameraView.enableView();
         }
         return matInput;
     }
 
-    private void saveImg(Bitmap bitmap, String textview) {
+    private String saveImg(Bitmap bitmap, String textview) {
+        String dir_path = "";
+        String filename = "";
 
         try {
             //저장할 파일 경로
-            File storageDir = new File(getExternalFilesDir() + "/capture");
+            File storageDir = new File(getFilesDir() + "/capture");
             if (!storageDir.exists()) //폴더가 없으면 생성.
                 storageDir.mkdirs();
 
-            String filename =  textView.getText().toString() + ".jpg";
+            filename =  textView.getText().toString() + ".jpg";
+            dir_path = storageDir.toString();
 
             // 기존에 있다면 삭제
             File file = new File(storageDir, filename);
@@ -420,11 +514,15 @@ public class MainActivity extends AppCompatActivity
 
             Log.d("TAG", "Captured Saved");
             Toast.makeText(this, "Capture Saved ", Toast.LENGTH_SHORT).show();
+
+            Log.e("filepath", storageDir.toString() +'/' + filename);
+
         } catch (Exception e) {
             Log.d("TAG", "Capture Saving Error!", e);
             Toast.makeText(this, "Save failed", Toast.LENGTH_SHORT).show();
 
         }
+        return dir_path +'/' + filename;
     }
 
 }
