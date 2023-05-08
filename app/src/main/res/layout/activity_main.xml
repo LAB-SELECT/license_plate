@@ -24,8 +24,9 @@
         android:layout_alignParentBottom="true"
         android:layout_alignParentRight="true"
         android:background="#00000000"
-        android:text=""
+        android:text="fps"
         android:layout_marginEnd="30dp"
+        android:visibility="invisible"
         android:textColor="@color/red"
         android:layout_marginBottom="20dp"
         android:textSize="18sp" />
@@ -37,10 +38,10 @@
         android:layout_weight="1"
         android:layout_alignParentRight="true"
         android:background="#00000000"
-        android:text=""
+        android:text="nowtime"
         android:layout_marginEnd="5dp"
         android:layout_marginTop="3dp"
-        android:textColor="@color/red"
+        android:textColor="@color/black"
         android:textSize="18sp" />
 
     <TextView
@@ -50,10 +51,10 @@
         android:layout_weight="1"
         android:layout_alignParentRight="true"
         android:background="#00000000"
-        android:text=""
+        android:text="위도"
         android:layout_marginEnd="5dp"
         android:layout_marginTop="20dp"
-        android:textColor="@color/red"
+        android:textColor="@color/black"
         android:textSize="18sp" />
 
     <TextView
@@ -63,10 +64,10 @@
         android:layout_weight="1"
         android:layout_alignParentRight="true"
         android:background="#00000000"
-        android:text=""
+        android:text="경도"
         android:layout_marginEnd="5dp"
         android:layout_marginTop="38dp"
-        android:textColor="@color/red"
+        android:textColor="@color/black"
         android:textSize="18sp" />
 
     <ImageView
@@ -77,38 +78,82 @@
         android:layout_marginLeft="60dp"
         android:layout_alignParentTop="true"
         tools:srcCompat="@tools:sample/avatars[1]" />
+
     <TextView
         android:id="@+id/textView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text=""
-        android:textSize = "30sp"
+        android:textSize="30sp"
         android:textColor="#3DFF39"
         android:layout_marginLeft="60dp"
         android:layout_marginTop="105dp" />
 
     <Button
         android:id="@+id/button_capture"
-        android:layout_width="81dp"
-        android:layout_height="81dp"
-        android:text = "시작"
-        android:textSize="20dp"
-        android:backgroundTint="@color/red"
+        android:layout_width="80dp"
+        android:layout_height="65dp"
+        android:layout_below="@+id/tvLong"
         android:layout_alignParentRight="true"
-        android:layout_marginTop="70dp"
-        android:layout_marginEnd="18dp" />
+        android:layout_marginTop="10dp"
+        android:layout_marginRight="18dp"
+        android:backgroundTint="@color/red"
+        android:text="시작"
+        android:textSize="20sp" />
 
     <Button
         android:id="@+id/button_file"
-        android:layout_width="81dp"
-        android:layout_height="81dp"
-        android:text = "저장"
-        android:textSize="20dp"
-        android:backgroundTint="@color/red"
+        android:layout_width="80dp"
+        android:layout_height="65dp"
+        android:layout_below="@+id/button_capture"
         android:layout_alignParentRight="true"
-        android:layout_marginTop="200dp"
-        android:layout_marginEnd="18dp" />
+        android:layout_marginTop="10dp"
+        android:layout_marginRight="18dp"
+        android:backgroundTint="@color/red"
+        android:text="저장"
+        android:textSize="20sp" />
+
+    <Button
+        android:id="@+id/button_test"
+        android:layout_width="80dp"
+        android:layout_height="65dp"
+        android:layout_below="@+id/button_file"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="10dp"
+        android:layout_marginRight="18dp"
+        android:backgroundTint="@color/red"
+        android:text="TEST"
+        android:textSize="17sp" />
+
+    <TextView
+        android:id="@+id/test_tv"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/button_test"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="5dp"
+        android:layout_marginRight="5dp"
+        android:layout_weight="1"
+        android:background="#00000000"
+        android:text="test_num"
+        android:visibility="invisible"
+        android:textColor="@color/black"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/search_tv"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/test_tv"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="5dp"
+        android:layout_marginRight="5dp"
+        android:layout_weight="1"
+        android:background="#00000000"
+        android:text="yes"
+        android:textColor="@color/red"
+        android:textSize="18sp" />
 
 
 </RelativeLayout>

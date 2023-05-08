@@ -3,23 +3,28 @@ package com.carplate.camerax;
 
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.location.Location;
 import com.google.android.gms.location.LocationRequest;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Looper;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -42,7 +47,8 @@ import org.tensorflow.lite.gpu.GpuDelegate;
 import org.tensorflow.lite.nnapi.NnApiDelegate;
 
 
-
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -71,11 +77,14 @@ public class MainActivity extends AppCompatActivity
 
 
     private Button button; // 카메라 캡쳐버튼
+    private Button fileButton;
+    private Button testButton;
     private Boolean activationButton; // 캡쳐버튼 활성 유무
     private ImageView imageView; // 시각화
     private Mat matInput;
     public TextView textView, tvTime, tvNowTime; // textView: 번호판 tvTime: 추론시간
     public TextView tvLat, tvLong;
+    public TextView tvTest, tvSearch;
 
     public NnApiDelegate nnApiDelegate = null;
     GpuDelegate delegate = new GpuDelegate();
@@ -101,11 +110,18 @@ public class MainActivity extends AppCompatActivity
     Date mDate;
     SimpleDateFormat mFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
+    ArrayList<String> list = new ArrayList<>();
+
     // gps
     private FusedLocationProviderClient mFusedLocationProviderClient = null;
     private Location mLastLocation;
     private LocationRequest mLocationRequest;
     private static final int REQUEST_PERMISSION_LOCATION = 10;
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
+
+    // test
+    String carNum;
+    DBHelper dbHelper = new DBHelper(MainActivity.this, 1);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -130,12 +146,16 @@ public class MainActivity extends AppCompatActivity
         m_CameraView = (CameraBridgeViewBase)findViewById(R.id.activity_surface_view);
         activationButton = false;
         button = (Button) findViewById(R.id.button_capture);
+        fileButton = (Button) findViewById(R.id.button_file);
+        testButton = (Button) findViewById(R.id.button_test);
         textView = (TextView) findViewById(R.id.textView);
         tvLat = (TextView) findViewById(R.id.tvLat);
         tvLong = (TextView) findViewById(R.id.tvLong);
         imageView = (ImageView) findViewById(R.id.imageView);
         tvTime = (TextView) findViewById(R.id.tvTime);
         tvNowTime = (TextView) findViewById(R.id.tvNowTime);
+        tvTest = (TextView) findViewById(R.id.test_tv);
+        tvSearch = (TextView) findViewById(R.id.search_tv);
 
         button.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -152,6 +172,45 @@ public class MainActivity extends AppCompatActivity
                     button.setText("시작");
                     stoplocationUpdates();
                 }
+            }
+        });
+
+        fileButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                writeFile(list);
+            }
+        });
+
+        testButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Log.d("test", "testButton");
+                AlertDialog.Builder alert = new AlertDialog.Builder(MainActivity.this);
+                alert.setTitle("Test");
+                alert.setMessage("DB에 저장할 번호판을 작성하세요");
+
+                final EditText et = new EditText(MainActivity.this);
+                alert.setView(et);
+
+                alert.setPositiveButton("확인", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        carNum = et.getText().toString();
+                        dbHelper.insert(carNum);
+                        Toast.makeText(MainActivity.this, "success", Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
+                    }
+                });
+
+                alert.setNegativeButton("취소", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int wghich) {
+                        dialog.dismiss();
+                    }
+                });
+
+                alert.show();
             }
         });
 
@@ -402,6 +461,16 @@ public class MainActivity extends AppCompatActivity
                         tvTime.setText(infer_result);
                         textView.setText(result2);
                         imageView.setImageBitmap(onFrame3);
+
+                        carNum = textView.getText().toString();
+                        if(dbHelper.getResult(carNum)) {
+                            Toast.makeText(MainActivity.this, "exist", Toast.LENGTH_SHORT).show();
+                            tvSearch.setText("관내차량입니다.");
+                        }else{
+                            Toast.makeText(MainActivity.this, "no exist", Toast.LENGTH_SHORT).show();
+                            tvSearch.setText("관내차량이 아닙니다.");
+                        }
+
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -419,6 +488,24 @@ public class MainActivity extends AppCompatActivity
         mNow = System.currentTimeMillis();
         mDate = new Date(mNow);
         return mFormat.format(mDate);
+    }
+
+    private void requestLocationPermission() {
+        if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
+            // 권한이 거부되었을 경우 사용자에게 권한에 대한 이유를 설명합니다.
+            new AlertDialog.Builder(this)
+                    .setTitle("위치 권한 필요")
+                    .setMessage("이 앱을 사용하려면 위치 권한이 필요합니다.")
+                    .setPositiveButton("확인", (dialogInterface, i) -> {
+                        // 권한 요청 팝업을 표시합니다.
+                        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, LOCATION_PERMISSION_REQUEST_CODE);
+                    })
+                    .create()
+                    .show();
+        } else {
+            // 권한 요청 팝업을 표시합니다.
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, LOCATION_PERMISSION_REQUEST_CODE);
+        }
     }
 
     protected void startLocationUpdates() {
@@ -449,10 +536,44 @@ public class MainActivity extends AppCompatActivity
         tvNowTime.setText(getTime());
         tvLat.setText("위도 : " + mLastLocation.getLatitude());
         tvLong.setText("경도 : " + mLastLocation.getLongitude());
+        list.add(tvNowTime.getText() + ", " + textView.getText() + ","
+                + mLastLocation.getLatitude() + ", " + mLastLocation.getLongitude());
     }
 
     private void stoplocationUpdates() {
         Log.d("TAG", "stoplocationUpdates()");
         mFusedLocationProviderClient.removeLocationUpdates(mLocationCallback);
     }
+
+    public void writeFile(ArrayList<String> list) {
+
+        // 파일 저장 권한 확인
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            // 권한이 없을 경우 권한 요청 팝업 띄우기
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+        } else {
+            // 권한이 있을 경우 파일 쓰기 시작
+            // 외부 저장소(External Storage)가 마운트(인식) 되었을 때 동작
+            // getExternalStorageState() 함수를 통해 외부 저장장치가 Mount 되어 있는지를 확인
+            if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
+                // 다운로드 폴더에 "tagging.txt" 이름으로 txt 파일 저장
+                // Environment.DIRECTORY_DOWNLOADS - 기기의 기본 다운로드 폴더
+                File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath(), "gps" + ".txt");
+                try {
+                    FileWriter fw = new FileWriter(file, false);
+                    for (int i = 0; i < list.size(); i++) {
+                        fw.write(list.get(i));
+                        fw.write(System.getProperty("line.separator"));
+                    }
+                    fw.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    Toast.makeText(getApplicationContext(), "ERROR", Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                Toast.makeText(getApplicationContext(), "ERROR", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
 }
