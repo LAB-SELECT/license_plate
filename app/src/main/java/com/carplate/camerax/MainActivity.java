@@ -326,6 +326,9 @@ public class MainActivity extends AppCompatActivity
             int new_w = (int) (pt3_x-pt1_x);
             int new_h = (int) (pt3_y-pt1_y);
 
+            Imgproc.rectangle(matInput, new Point(m_CameraView.getLeft()-100, m_CameraView.getTop()-100), new Point(m_CameraView.getRight()-100, m_CameraView.getBottom()-100),
+                    new Scalar(0, 255, 0), 10);
+
             if (((pt1_x < 100) || ((pt1_x + new_w) > m_CameraView.getRight() - 100)) || (new_w < 50)) {
                 Log.d("log:: ", "Out of Bound");
             } else {
