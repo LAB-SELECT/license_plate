@@ -328,7 +328,7 @@ public class MainActivity extends AppCompatActivity
 
             //Imgproc.rectangle(matInput, new Point(m_CameraView.getLeft()+200, m_CameraView.getTop()+200), new Point(m_CameraView.getRight()-400, m_CameraView.getBottom()-200),new Scalar(0, 255, 0), 10);
 
-            if (((pt1_x < m_CameraView.getLeft()+200) || ((pt1_x + new_w) > m_CameraView.getRight()-400)) || (new_w < 50)) {
+            if (((pt1_x < m_CameraView.getLeft()+200) || ((pt1_x + new_w) > m_CameraView.getRight()-400)) || ((pt1_y < m_CameraView.getTop()+200) || ((pt1_y + new_h) > m_CameraView.getBottom()-200)) || (new_w < 50)) {
                 Log.d("log:: ", "Out of Bound");
             } else {
 
