@@ -55,6 +55,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 import static android.Manifest.permission.CAMERA;
 
@@ -64,6 +65,17 @@ import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+import retrofit2.http.Body;
+import retrofit2.http.Headers;
+import retrofit2.http.POST;
 
 public class MainActivity extends AppCompatActivity
         implements CameraBridgeViewBase.CvCameraViewListener2 {
@@ -94,16 +106,37 @@ public class MainActivity extends AppCompatActivity
 
 
     long start,end; // 전체 추론시간
+    boolean cFlag=true;
+    Call<JsonObject> call;
     long[] inferenceTime = new long[3]; // 모델별 추론시간
 
     private Bitmap onFrame; // yolo input
     private Bitmap onFrame2; // alignment input
     private Bitmap onFrame3; // char input
+    private Bitmap onFrame4;
+    String onFrame4_base64;
+    String infer_result = "";
 
     // 모델 정의
     DHDetectionModel detectionModel;
     AlignmentModel alignmentModel;
-    CharModel charModel;
+
+    public interface OCRService {
+        @Headers({
+                "Content-Type: application/json; charset=utf-8",
+                "X-OCR-SECRET: "
+        })
+        @POST("general")
+        Call<JsonObject> doOCR(@Body JsonObject requestBody);
+    }
+    private static final String BASE_URL = "";
+
+    private final Retrofit retrofit = new Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build();
+
+    private final OCRService ocrService = retrofit.create(OCRService.class);
 
     // 현재 시간
     long mNow;
@@ -223,7 +256,6 @@ public class MainActivity extends AppCompatActivity
             detectionModel = new DHDetectionModel(this, options);
             //Toast.makeText(this.getApplicationContext(), options.toString(), Toast.LENGTH_LONG).show();
             alignmentModel = new AlignmentModel(this, options1);
-            charModel = new CharModel(this, options1);
 
         }
         catch(IOException e){
@@ -385,82 +417,91 @@ public class MainActivity extends AppCompatActivity
             int new_w = (int) (pt3_x-pt1_x);
             int new_h = (int) (pt3_y-pt1_y);
 
-            Imgproc.rectangle(matInput, new Point(pt1_x,pt1_y), new Point(pt3_x,pt3_y),
-                    new Scalar(0, 255, 0), 10);
 
-            Log.d("log:: ","pt1_x: "+pt1_x+" pt1_y: "+pt1_y+" new_w: "+new_w+" new_h: "+new_h);
+            //Imgproc.rectangle(matInput, new Point(m_CameraView.getLeft()+200, m_CameraView.getTop()+200), new Point(m_CameraView.getRight()-400, m_CameraView.getBottom()-200),new Scalar(0, 255, 0), 10);
 
-            Rect roi = new Rect(pt1_x, pt1_y, new_w, new_h);
-            Log.d("log:: ","x: "+roi.x+" y: "+roi.y+" w: "+roi.width+" h: "+roi.height);
-            Log.d("input log:: ","cols: "+input.cols()+" rows: "+input.rows());
-            if(roi.x + roi.width>input.cols() || roi.x<0 || roi.width<0 || roi.y+roi.height>input.rows() || roi.y<0 || roi.height<0)
-                return matInput;
-            Mat croppedImage = new Mat(input, roi);
-            Mat toDetImage2 = new Mat();
-            Size sz2 = new Size(128, 128);
-            Imgproc.resize(croppedImage, toDetImage2, sz2);
-            onFrame2 = Bitmap.createBitmap(toDetImage2.cols(), toDetImage2.rows(), Bitmap.Config.ARGB_8888);
-            Utils.matToBitmap(toDetImage2, onFrame2);
+            if (((pt1_x < m_CameraView.getLeft()+200) || ((pt1_x + new_w) > m_CameraView.getRight()-400)) || ((pt1_y < m_CameraView.getTop()+200) || ((pt1_y + new_h) > m_CameraView.getBottom()-200)) || (new_w < 50)) {
+                Log.d("log:: ", "Out of Bound");
+            } else {
+                Imgproc.rectangle(matInput, new Point(pt1_x, pt1_y), new Point(pt3_x, pt3_y),
+                        new Scalar(0, 255, 0), 10);
 
-            long align_s = System.currentTimeMillis();
-            float[] coord2 = alignmentModel.getCoordinate(onFrame2);
-            long align_e = System.currentTimeMillis();
-            inferenceTime[1] = align_e-align_s;
-            float[] new_coord2 = new float[8];
+                Log.d("log:: ", "pt1_x: " + pt1_x + " pt1_y: " + pt1_y + " new_w: " + new_w + " new_h: " + new_h);
 
-            // sigmoid
-            for(int i=0;i<8;i++){
-                new_coord2[i] = (float) (Math.exp(-(coord2[i]))+1);
-                new_coord2[i] = 1/new_coord2[i];
-                new_coord2[i] = new_coord2[i]*128;
+                Rect roi = new Rect(pt1_x, pt1_y, new_w, new_h);
+                Log.d("log:: ", "x: " + roi.x + " y: " + roi.y + " w: " + roi.width + " h: " + roi.height);
+                Log.d("input log:: ", "cols: " + input.cols() + " rows: " + input.rows());
+                if (roi.x + roi.width > input.cols() || roi.x < 0 || roi.width < 0 || roi.y + roi.height > input.rows() || roi.y < 0 || roi.height < 0)
+                    return matInput;
+                Mat croppedImage = new Mat(input, roi);
+                Mat toDetImage2 = new Mat();
+                Size sz2 = new Size(128, 128);
+                Imgproc.resize(croppedImage, toDetImage2, sz2);
+                onFrame2 = Bitmap.createBitmap(toDetImage2.cols(), toDetImage2.rows(), Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(toDetImage2, onFrame2);
+
+                long align_s = System.currentTimeMillis();
+                float[] coord2 = alignmentModel.getCoordinate(onFrame2);
+                long align_e = System.currentTimeMillis();
+                inferenceTime[1] = align_e - align_s;
+                float[] new_coord2 = new float[8];
+
+                // sigmoid
+                for (int i = 0; i < 8; i++) {
+                    new_coord2[i] = (float) (Math.exp(-(coord2[i])) + 1);
+                    new_coord2[i] = 1 / new_coord2[i];
+                    new_coord2[i] = new_coord2[i] * 128;
+                }
+
+                // perspective transformation
+                Mat outputImage = new Mat(256, 128, CvType.CV_8UC3);
+                List<Point> src_pnt = new ArrayList<Point>();
+
+                Point p0 = new Point(new_coord2[0], new_coord2[1]);
+                Point p1 = new Point(new_coord2[2], new_coord2[3]);
+                Point p2 = new Point(new_coord2[4], new_coord2[5]);
+                Point p3 = new Point(new_coord2[6], new_coord2[7]);
+
+                src_pnt.add(p0);
+                src_pnt.add(p1);
+                src_pnt.add(p2);
+                src_pnt.add(p3);
+
+                Mat startM = Converters.vector_Point2f_to_Mat(src_pnt);
+                List<Point> dst_pnt = new ArrayList<Point>();
+                Point p4 = new Point(0, 0);
+                Point p5 = new Point(255, 0);
+                Point p6 = new Point(255, 127);
+                Point p7 = new Point(0, 127);
+                dst_pnt.add(p4);
+                dst_pnt.add(p5);
+                dst_pnt.add(p6);
+                dst_pnt.add(p7);
+                Mat endM = Converters.vector_Point2f_to_Mat(dst_pnt);
+                Mat M = Imgproc.getPerspectiveTransform(startM, endM);
+                Size size2 = new Size(256, 128);
+                Imgproc.warpPerspective(toDetImage2, outputImage, M, size2, Imgproc.INTER_CUBIC + Imgproc.CV_WARP_FILL_OUTLIERS);
+                onFrame3 = Bitmap.createBitmap(outputImage.cols(), outputImage.rows(), Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(outputImage, onFrame3);
+
+                // char prediction
+                long char_s = System.currentTimeMillis();
+                //String result = charModel.getString(onFrame3);
+                //String result2 = result.substring(0, 3) + " " + result.substring(3);
+                long char_e = System.currentTimeMillis();
+                inferenceTime[2] = char_e - char_s;
+                end = System.currentTimeMillis();
+                double fps = Math.round(((1.0 / (end - start)) * 1000 * 100.0)) / 100.0;
+                infer_result = fps + "  fps";
             }
-
-            // perspective transformation
-            Mat outputImage = new Mat(256, 128, CvType.CV_8UC3);
-            List<Point> src_pnt = new ArrayList<Point>();
-
-            Point p0 = new Point(new_coord2[0], new_coord2[1]);        Point p1 = new Point(new_coord2[2], new_coord2[3]);
-            Point p2 = new Point(new_coord2[4], new_coord2[5]);        Point p3 = new Point(new_coord2[6], new_coord2[7]);
-
-            src_pnt.add(p0);
-            src_pnt.add(p1);
-            src_pnt.add(p2);
-            src_pnt.add(p3);
-
-            Mat startM = Converters.vector_Point2f_to_Mat(src_pnt);
-            List<Point> dst_pnt = new ArrayList<Point>();
-            Point p4 = new Point(0, 0);
-            Point p5 = new Point(255, 0);
-            Point p6 = new Point(255, 127);
-            Point p7 = new Point(0, 127);
-            dst_pnt.add(p4);
-            dst_pnt.add(p5);
-            dst_pnt.add(p6);
-            dst_pnt.add(p7);
-            Mat endM = Converters.vector_Point2f_to_Mat(dst_pnt);
-            Mat M = Imgproc.getPerspectiveTransform(startM, endM);
-            Size size2 = new Size(256, 128);
-            Imgproc.warpPerspective(toDetImage2, outputImage, M, size2, Imgproc.INTER_CUBIC+ Imgproc.CV_WARP_FILL_OUTLIERS);
-            onFrame3 = Bitmap.createBitmap(outputImage.cols(), outputImage.rows(), Bitmap.Config.ARGB_8888);
-            Utils.matToBitmap(outputImage, onFrame3);
-
-            // char prediction
-            long char_s = System.currentTimeMillis();
-            String result = charModel.getString(onFrame3);
-            String result2 = result.substring(0,3) + " " + result.substring(3);
-            long char_e = System.currentTimeMillis();
-            inferenceTime[2] = char_e-char_s;
-            end = System.currentTimeMillis();
-            double fps = Math.round(((1.0/(end-start))*1000*100.0))/100.0;
-            String infer_result = fps + "  fps";
 
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
                     try {
                         tvTime.setText(infer_result);
-                        textView.setText(result2);
-                        imageView.setImageBitmap(onFrame3);
+                        imageView.setImageBitmap(onFrame4);
+                        carPlate_num(onFrame4_base64);
 
                         carNum = textView.getText().toString();
                         if(dbHelper.getResult(carNum)) {
@@ -576,4 +617,68 @@ public class MainActivity extends AppCompatActivity
         }
     }
 
+    private void carPlate_num (String onFrame4) {
+        if (cFlag) {
+            JsonObject requestBody = new JsonObject();
+            requestBody.addProperty("version", "V2");
+            requestBody.addProperty("requestId", UUID.randomUUID().toString());
+            requestBody.addProperty("timestamp", System.currentTimeMillis());
+
+            JsonObject image = new JsonObject();
+            image.addProperty("format", "png");
+            image.addProperty("name", "carPlate");
+            image.addProperty("data", onFrame4);
+
+            JsonArray images = new JsonArray();
+            images.add(image);
+
+            requestBody.add("images", images);
+            //Log.e("json 파일", String.valueOf(requestBody));
+
+            call = ocrService.doOCR(requestBody);
+            cFlag = false;
+            Log.e("json 파일", String.valueOf(cFlag));
+        } else {
+            call.enqueue(new Callback<JsonObject>() {
+                @Override
+                public void onResponse(Call<JsonObject> call, Response<JsonObject> response) {
+                    String strs="";
+                    if (response.isSuccessful()) {
+                        JsonObject result = response.body();
+                        //Log.e("json 파일", String.valueOf(result));
+                        JsonArray imagesArr = result.getAsJsonArray("images");
+                        //Log.e("json 파일", String.valueOf(imagesArr));
+                        JsonObject firstImageObj = (JsonObject) imagesArr.get(0);
+                        //Log.e("json 파일", String.valueOf(firstImageObj));
+                        JsonArray fieldsArr = firstImageObj.getAsJsonArray("fields");
+                        //Log.e("json 파일", String.valueOf(fieldsArr));
+                        for (int i=0; i<fieldsArr.size(); i++){
+                            JsonObject job = (JsonObject) fieldsArr.get(i);
+                            //Log.e("json 파일", String.valueOf(job));
+                            strs = strs + job.get("inferText");
+                            //.e("json 파일", String.valueOf(job.get("inferText")));
+                        }
+                        //Log.e("json 파일", strs);
+
+                        String carPlate_num = strs.replaceAll("[^ㄱ-ㅎㅏ-ㅣ가-힣0-9]", "");
+                        textView.setText(carPlate_num);
+                        //Toast.makeText(getApplicationContext(), strs, Toast.LENGTH_LONG).show();
+                        //Toast.makeText(getApplicationContext(), carPlate_num, Toast.LENGTH_LONG).show();
+                        Log.e("텍스트 인식", "성공");
+
+                    } else {
+                        Log.e("텍스트 인식", "실패");
+                    }
+                    cFlag = true;
+                    Log.e("json 파일", String.valueOf(cFlag));
+                }
+                @Override
+                public void onFailure(Call<JsonObject> call, Throwable t) {
+                    Log.e("전송", "실패: ");
+                    cFlag = false;
+                    Log.e("json 파일", String.valueOf(cFlag));
+                }
+            });
+        }
+    }
 }
