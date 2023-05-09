@@ -124,12 +124,12 @@ public class MainActivity extends AppCompatActivity
     public interface OCRService {
         @Headers({
                 "Content-Type: application/json; charset=utf-8",
-                "X-OCR-SECRET: "
+                "X-OCR-SECRET: Tk5URUlGaEZsdFZ4UndTUGpZY0Nydnd5amRrV3RNSms="
         })
         @POST("general")
         Call<JsonObject> doOCR(@Body JsonObject requestBody);
     }
-    private static final String BASE_URL = "";
+    private static final String BASE_URL = "https://k3jyg1t7lb.apigw.ntruss.com/custom/v1/21307/d6c07e9b3b323a6498af50bc24fc0211e8acd512b02e7df2899181011329a6c7/";
 
     private final Retrofit retrofit = new Retrofit.Builder()
             .baseUrl(BASE_URL)
