@@ -19,6 +19,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Looper;
+import android.util.Base64;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
@@ -47,6 +48,7 @@ import org.tensorflow.lite.gpu.GpuDelegate;
 import org.tensorflow.lite.nnapi.NnApiDelegate;
 
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -439,6 +441,16 @@ public class MainActivity extends AppCompatActivity
                 Imgproc.resize(croppedImage, toDetImage2, sz2);
                 onFrame2 = Bitmap.createBitmap(toDetImage2.cols(), toDetImage2.rows(), Bitmap.Config.ARGB_8888);
                 Utils.matToBitmap(toDetImage2, onFrame2);
+                Mat toplateImage = new Mat();
+                Size sz3 = new Size(256, 128);
+                Imgproc.resize(croppedImage, toplateImage, sz3);
+                onFrame4 = Bitmap.createBitmap(toplateImage.cols(), toplateImage.rows(), Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(toplateImage, onFrame4);
+
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                onFrame4.compress(Bitmap.CompressFormat.PNG, 100, baos);
+                byte[] bImage = baos.toByteArray();
+                onFrame4_base64 = Base64.encodeToString(bImage, 0);
 
                 long align_s = System.currentTimeMillis();
                 float[] coord2 = alignmentModel.getCoordinate(onFrame2);
