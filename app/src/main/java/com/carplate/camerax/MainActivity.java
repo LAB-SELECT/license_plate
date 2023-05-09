@@ -106,12 +106,12 @@ public class MainActivity extends AppCompatActivity
     public interface OCRService {
         @Headers({
                 "Content-Type: application/json; charset=utf-8",
-                "X-OCR-SECRET: allabElldHVKSWtDem1qdURvWk5FSEdGTGRmbXZLR24="
+                "X-OCR-SECRET: "
         })
         @POST("general")
         Call<JsonObject> doOCR(@Body JsonObject requestBody);
     }
-    private static final String BASE_URL = "https://k3jyg1t7lb.apigw.ntruss.com/custom/v1/21307/d6c07e9b3b323a6498af50bc24fc0211e8acd512b02e7df2899181011329a6c7/";
+    private static final String BASE_URL = "";
 
     private final Retrofit retrofit = new Retrofit.Builder()
             .baseUrl(BASE_URL)
@@ -326,10 +326,9 @@ public class MainActivity extends AppCompatActivity
             int new_w = (int) (pt3_x-pt1_x);
             int new_h = (int) (pt3_y-pt1_y);
 
-            Imgproc.rectangle(matInput, new Point(m_CameraView.getLeft()+200, m_CameraView.getTop()+200), new Point(m_CameraView.getRight()-400, m_CameraView.getBottom()-200),
-                    new Scalar(0, 255, 0), 10);
+            //Imgproc.rectangle(matInput, new Point(m_CameraView.getLeft()+200, m_CameraView.getTop()+200), new Point(m_CameraView.getRight()-400, m_CameraView.getBottom()-200),new Scalar(0, 255, 0), 10);
 
-            if (((pt1_x < 100) || ((pt1_x + new_w) > m_CameraView.getRight() - 100)) || (new_w < 50)) {
+            if (((pt1_x < m_CameraView.getLeft()+200) || ((pt1_x + new_w) > m_CameraView.getRight()-400)) || (new_w < 50)) {
                 Log.d("log:: ", "Out of Bound");
             } else {
 
