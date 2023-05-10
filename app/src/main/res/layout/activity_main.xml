@@ -41,7 +41,7 @@
         android:text="nowtime"
         android:layout_marginEnd="5dp"
         android:layout_marginTop="3dp"
-        android:textColor="@color/black"
+        android:textColor="@color/red"
         android:textSize="18sp" />
 
     <TextView
@@ -54,7 +54,7 @@
         android:text="위도"
         android:layout_marginEnd="5dp"
         android:layout_marginTop="20dp"
-        android:textColor="@color/black"
+        android:textColor="@color/red"
         android:textSize="18sp" />
 
     <TextView
@@ -67,7 +67,7 @@
         android:text="경도"
         android:layout_marginEnd="5dp"
         android:layout_marginTop="38dp"
-        android:textColor="@color/black"
+        android:textColor="@color/red"
         android:textSize="18sp" />
 
     <ImageView

@@ -58,6 +58,8 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static android.Manifest.permission.CAMERA;
 
@@ -126,7 +128,7 @@ public class MainActivity extends AppCompatActivity
     public interface OCRService {
         @Headers({
                 "Content-Type: application/json; charset=utf-8",
-                "X-OCR-SECRET: "
+                "X-OCR-SECRET: QmlsQVJod3l1RlBEeWtoRmNFQnBXeHNYd2hBalVCYWQ= "
         })
         @POST("general")
         Call<JsonObject> doOCR(@Body JsonObject requestBody);
@@ -158,10 +160,58 @@ public class MainActivity extends AppCompatActivity
     String carNum;
     DBHelper dbHelper = new DBHelper(MainActivity.this, 1);
 
+    private static final int PERMISSION_REQUEST_CODE = 1;
+    private static final String[] PERMISSIONS = {
+            Manifest.permission.CAMERA,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.ACCESS_FINE_LOCATION
+    };
+
+    // 권한을 모두 가지고 있는지 확인
+    private boolean hasPermissions() {
+        for (String permission : PERMISSIONS) {
+            if (ActivityCompat.checkSelfPermission(this, permission) !=
+                    PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // 권한 요청 대화상자 표시
+    private void requestPermissions() {
+        ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_REQUEST_CODE);
+    }
+
+    // 권한 요청 결과 처리
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            boolean isAllGranted = true;
+            for (int grantResult : grantResults) {
+                if (grantResult != PackageManager.PERMISSION_GRANTED) {
+                    isAllGranted = false;
+                    break;
+                }
+            }
+            if (isAllGranted) {
+                // 권한이 모두 승인되었을 때 실행할 코드
+            } else {
+                // 권한이 거부되었을 때 처리할 코드
+            }
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Log.d("Permission::","onCreate");
+
+        if (!hasPermissions()) {
+            requestPermissions();
+        }
 
         // gps
         mLocationRequest = new LocationRequest();
@@ -199,7 +249,6 @@ public class MainActivity extends AppCompatActivity
                     activationButton = true;
                     m_CameraView.enableView();
                     button.setText("중지");
-                    startLocationUpdates();
 
                 } else {
                     activationButton = false;
@@ -511,16 +560,19 @@ public class MainActivity extends AppCompatActivity
                 @Override
                 public void run() {
                     try {
+                        // gps
+                        startLocationUpdates();
+
                         tvTime.setText(infer_result);
                         imageView.setImageBitmap(onFrame4);
                         carPlate_num(onFrame4_base64);
 
                         carNum = textView.getText().toString();
                         if(dbHelper.getResult(carNum)) {
-                            Toast.makeText(MainActivity.this, "exist", Toast.LENGTH_SHORT).show();
+//                            Toast.makeText(MainActivity.this, "exist", Toast.LENGTH_SHORT).show();
                             tvSearch.setText("관내차량입니다.");
                         }else{
-                            Toast.makeText(MainActivity.this, "no exist", Toast.LENGTH_SHORT).show();
+//                            Toast.makeText(MainActivity.this, "no exist", Toast.LENGTH_SHORT).show();
                             tvSearch.setText("관내차량이 아닙니다.");
                         }
 
@@ -589,8 +641,8 @@ public class MainActivity extends AppCompatActivity
         tvNowTime.setText(getTime());
         tvLat.setText("위도 : " + mLastLocation.getLatitude());
         tvLong.setText("경도 : " + mLastLocation.getLongitude());
-        list.add(tvNowTime.getText() + ", " + textView.getText() + ","
-                + mLastLocation.getLatitude() + ", " + mLastLocation.getLongitude());
+        list.add(tvNowTime.getText() + ", " + textView.getText() + ", "
+                + mLastLocation.getLatitude() + ", " + mLastLocation.getLongitude() + ", " + tvSearch.getText());
     }
 
     private void stoplocationUpdates() {
@@ -673,6 +725,17 @@ public class MainActivity extends AppCompatActivity
                         //Log.e("json 파일", strs);
 
                         String carPlate_num = strs.replaceAll("[^ㄱ-ㅎㅏ-ㅣ가-힣0-9]", "");
+                        Pattern pattern = Pattern.compile("[ㄱ-ㅎㅏ-ㅣ가-힣]");
+                        Matcher matcher = pattern.matcher(carPlate_num);
+
+                        if (matcher.find()) {
+                            System.out.println("한글이 있는 인덱스: " + matcher.start());
+                            System.out.println(carPlate_num.length());
+                            carPlate_num = carPlate_num.substring(0, matcher.start() + 5).replaceAll("[^ㄱ-ㅎㅏ-ㅣ가-힣0-9]", "");
+                        } else {
+                            System.out.println("문자열에 한글이 없습니다.");
+                        }
+
                         textView.setText(carPlate_num);
                         //Toast.makeText(getApplicationContext(), strs, Toast.LENGTH_LONG).show();
                         //Toast.makeText(getApplicationContext(), carPlate_num, Toast.LENGTH_LONG).show();
