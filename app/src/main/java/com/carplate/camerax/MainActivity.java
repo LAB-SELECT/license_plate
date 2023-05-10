@@ -128,7 +128,7 @@ public class MainActivity extends AppCompatActivity
     public interface OCRService {
         @Headers({
                 "Content-Type: application/json; charset=utf-8",
-                "X-OCR-SECRET: QmlsQVJod3l1RlBEeWtoRmNFQnBXeHNYd2hBalVCYWQ= "
+                "X-OCR-SECRET: "
         })
         @POST("general")
         Call<JsonObject> doOCR(@Body JsonObject requestBody);
