@@ -123,8 +123,8 @@
         android:layout_marginTop="10dp"
         android:layout_marginRight="18dp"
         android:backgroundTint="@color/red"
-        android:text="TEST"
-        android:textSize="17sp" />
+        android:text="DB 생성"
+        android:textSize="18sp" />
 
     <TextView
         android:id="@+id/test_tv"

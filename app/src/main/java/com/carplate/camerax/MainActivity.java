@@ -15,6 +15,10 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.location.Location;
 import com.google.android.gms.location.LocationRequest;
+
+import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.media.SoundPool;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -128,7 +132,7 @@ public class MainActivity extends AppCompatActivity
     public interface OCRService {
         @Headers({
                 "Content-Type: application/json; charset=utf-8",
-                "X-OCR-SECRET: "
+                "X-OCR-SECRET: QmlsQVJod3l1RlBEeWtoRmNFQnBXeHNYd2hBalVCYWQ="
         })
         @POST("general")
         Call<JsonObject> doOCR(@Body JsonObject requestBody);
@@ -146,6 +150,7 @@ public class MainActivity extends AppCompatActivity
     long mNow;
     Date mDate;
     SimpleDateFormat mFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    SimpleDateFormat fFormat = new SimpleDateFormat("yyyyMMdd_HHmm");
 
     ArrayList<String> list = new ArrayList<>();
 
@@ -159,6 +164,9 @@ public class MainActivity extends AppCompatActivity
     // test
     String carNum;
     DBHelper dbHelper = new DBHelper(MainActivity.this, 1);
+
+    SoundPool sound;
+    int soundId;
 
     private static final int PERMISSION_REQUEST_CODE = 1;
     private static final String[] PERMISSIONS = {
@@ -209,9 +217,15 @@ public class MainActivity extends AppCompatActivity
         super.onCreate(savedInstanceState);
         Log.d("Permission::","onCreate");
 
+//        DebugDB.getAddressLog();
+
         if (!hasPermissions()) {
             requestPermissions();
         }
+
+        // sound
+        sound = new SoundPool(5, AudioManager.STREAM_MUSIC, 0);
+        soundId = sound.load(this, R.raw.sound, 1);
 
         // gps
         mLocationRequest = new LocationRequest();
@@ -245,16 +259,21 @@ public class MainActivity extends AppCompatActivity
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (!activationButton) {
-                    activationButton = true;
-                    m_CameraView.enableView();
-                    button.setText("중지");
+                try {
+                    if (!activationButton) {
+                        activationButton = true;
+                        m_CameraView.enableView();
+                        button.setText("중지");
 
-                } else {
-                    activationButton = false;
-                    m_CameraView.disableView();
-                    button.setText("시작");
-                    stoplocationUpdates();
+                    } else {
+                        activationButton = false;
+                        m_CameraView.disableView();
+                        button.setText("시작");
+                        stoplocationUpdates();
+                    }
+                } catch (Exception e) {
+                    String errorMessage = e.getMessage();
+                    saveErrorMessageToFile(errorMessage);
                 }
             }
         });
@@ -570,10 +589,28 @@ public class MainActivity extends AppCompatActivity
                         carNum = textView.getText().toString();
                         if(dbHelper.getResult(carNum)) {
 //                            Toast.makeText(MainActivity.this, "exist", Toast.LENGTH_SHORT).show();
-                            tvSearch.setText("관내차량입니다.");
+                            Log.d("DB", "관내차량");
+                            tvSearch.setText("관내차량");
                         }else{
 //                            Toast.makeText(MainActivity.this, "no exist", Toast.LENGTH_SHORT).show();
-                            tvSearch.setText("관내차량이 아닙니다.");
+                            tvSearch.setText("관외차량");
+                        }
+
+                        String currentText = textView.getText().toString();
+                        String currentTextClear = extractNumbers(currentText);
+
+                        boolean isDuplicate = false;
+                        for (String item : list) {
+                            String itemText = extractNumbers(item.split(",")[1].trim());
+                            if (currentTextClear.equals(itemText)) {
+                                isDuplicate = true;
+                                break;
+                            }
+                        }
+
+                        if (!isDuplicate) {
+                            list.add(tvNowTime.getText() + ", " + currentText + ", "
+                                    + mLastLocation.getLatitude() + ", " + mLastLocation.getLongitude() + ", " + tvSearch.getText());
                         }
 
                     } catch (Exception e) {
@@ -641,8 +678,27 @@ public class MainActivity extends AppCompatActivity
         tvNowTime.setText(getTime());
         tvLat.setText("위도 : " + mLastLocation.getLatitude());
         tvLong.setText("경도 : " + mLastLocation.getLongitude());
-        list.add(tvNowTime.getText() + ", " + textView.getText() + ", "
-                + mLastLocation.getLatitude() + ", " + mLastLocation.getLongitude() + ", " + tvSearch.getText());
+
+//        String currentText = textView.getText().toString();
+//        String currentTextClear = extractNumbers(currentText);
+//
+//        boolean isDuplicate = false;
+//        for (String item : list) {
+//            String itemText = extractNumbers(item.split(",")[1].trim());
+//            if (currentTextClear.equals(itemText)) {
+//                isDuplicate = true;
+//                break;
+//            }
+//        }
+//
+//        if (!isDuplicate) {
+//            list.add(tvNowTime.getText() + ", " + currentText + ", "
+//                    + mLastLocation.getLatitude() + ", " + mLastLocation.getLongitude() + ", " + tvSearch.getText());
+//        }
+    }
+
+    private String extractNumbers(String input) {
+        return input.replaceAll("[^0-9]", "");
     }
 
     private void stoplocationUpdates() {
@@ -663,7 +719,10 @@ public class MainActivity extends AppCompatActivity
             if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
                 // 다운로드 폴더에 "tagging.txt" 이름으로 txt 파일 저장
                 // Environment.DIRECTORY_DOWNLOADS - 기기의 기본 다운로드 폴더
-                File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath(), "gps" + ".txt");
+                mNow = System.currentTimeMillis();
+                mDate = new Date(mNow);
+                String time = fFormat.format(mDate);
+                File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath(), time + ".txt");
                 try {
                     FileWriter fw = new FileWriter(file, false);
                     for (int i = 0; i < list.size(); i++) {
@@ -671,6 +730,7 @@ public class MainActivity extends AppCompatActivity
                         fw.write(System.getProperty("line.separator"));
                     }
                     fw.close();
+                    Toast.makeText(getApplicationContext(), "파일이 저장되었습니다.", Toast.LENGTH_SHORT).show();
                 } catch (IOException e) {
                     e.printStackTrace();
                     Toast.makeText(getApplicationContext(), "ERROR", Toast.LENGTH_SHORT).show();
@@ -730,16 +790,24 @@ public class MainActivity extends AppCompatActivity
 
                         if (matcher.find()) {
                             System.out.println("한글이 있는 인덱스: " + matcher.start());
-                            System.out.println(carPlate_num.length());
-                            carPlate_num = carPlate_num.substring(0, matcher.start() + 5).replaceAll("[^ㄱ-ㅎㅏ-ㅣ가-힣0-9]", "");
+//                            System.out.println(carPlate_num.length());
+                            if(matcher.start() > 4) {
+                                carPlate_num = carPlate_num.substring(matcher.start() - 3, matcher.start() + 5).replaceAll("[^ㄱ-ㅎㅏ-ㅣ가-힣0-9]", "");
+                            } else {
+                                carPlate_num = carPlate_num.substring(0, matcher.start() + 5).replaceAll("[^ㄱ-ㅎㅏ-ㅣ가-힣0-9]", "");
+                            }
                         } else {
                             System.out.println("문자열에 한글이 없습니다.");
                         }
 
                         textView.setText(carPlate_num);
+
                         //Toast.makeText(getApplicationContext(), strs, Toast.LENGTH_LONG).show();
                         //Toast.makeText(getApplicationContext(), carPlate_num, Toast.LENGTH_LONG).show();
                         Log.e("텍스트 인식", "성공");
+
+                        // sound
+                        sound.play(soundId, 1f, 1f, 0, 0, 1f);
 
                     } else {
                         Log.e("텍스트 인식", "실패");
@@ -754,6 +822,22 @@ public class MainActivity extends AppCompatActivity
                     Log.e("json 파일", String.valueOf(cFlag));
                 }
             });
+        }
+    }
+
+    private void saveErrorMessageToFile(String errorMessage) {
+        String filename = "error_log.txt";
+        String filepath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getPath();
+        File file = new File(filepath, filename);
+
+        try {
+            FileWriter writer = new FileWriter(file, true);
+            writer.append(errorMessage);
+            writer.append("\n");
+            writer.flush();
+            writer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }
