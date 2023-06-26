@@ -26,6 +26,12 @@ public class DBHelper extends SQLiteOpenHelper {
         onCreate(db);
     }
 
+    public void deleteAll() {
+        SQLiteDatabase db = getWritableDatabase();
+        db.execSQL("DELETE FROM ExistCar");
+        db.close();
+    }
+
     // Person Table 데이터 입력
     public void insert(String carNum) {
         SQLiteDatabase db = getWritableDatabase();
@@ -47,6 +53,17 @@ public class DBHelper extends SQLiteOpenHelper {
         db.close();
     }
      */
+
+    public void check() {
+        // 읽기가 가능하게 DB 열기
+        SQLiteDatabase db = getReadableDatabase();
+
+        // DB에 있는 데이터를 쉽게 처리하기 위해 Cursor를 사용하여 테이블에 있는 모든 데이터 출력
+        Cursor cursor = db.rawQuery("SELECT * FROM ExistCar", null);
+        while (cursor.moveToNext()) {
+            Log.d("cursor", cursor.getString(0));
+        }
+    }
 
     // Person Table 조회
     public boolean getResult(String carNum) {

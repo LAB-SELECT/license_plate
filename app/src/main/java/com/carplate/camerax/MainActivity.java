@@ -12,6 +12,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
+import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.location.Location;
 import com.google.android.gms.location.LocationRequest;
@@ -52,10 +53,18 @@ import org.tensorflow.lite.gpu.GpuDelegate;
 import org.tensorflow.lite.nnapi.NnApiDelegate;
 
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -212,12 +221,42 @@ public class MainActivity extends AppCompatActivity
         }
     }
 
+    private void readTextFile() {
+        try {
+            String filePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath() + "/test.txt";
+            File file = new File(filePath);
+
+            // 파일 열기
+            InputStream inputStream = new FileInputStream(file);
+
+            // 텍스트 파일 읽기 위한 BufferedReader 생성
+            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+
+            String line;
+            // 한 줄씩 읽기
+            while ((line = reader.readLine()) != null) {
+                dbHelper.insert(line);
+                Log.d("TextFile", line);
+            }
+
+            // 리소스 해제
+            reader.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Log.d("Permission::","onCreate");
 
+
 //        DebugDB.getAddressLog();
+        dbHelper.deleteAll();
+        readTextFile();
+        dbHelper.check();
+
 
         if (!hasPermissions()) {
             requestPermissions();
