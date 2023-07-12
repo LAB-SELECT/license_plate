@@ -1,0 +1,1 @@
+C:\Users\user\AndroidStudioProjects\NeoParking_camera\OpenCV\build\intermediates\cxx\RelWithDebInfo\27115j5r\obj\x86

@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Parking Check</string>
+    <string name="searchname">조사자 성명</string>
+    <string name="model">차종</string>
+    <string name="legal">적법 불법</string>
+    <string name="number">차량번호</string>
+    <string name="lat">위도</string>
+    <string name="lng">경도</string>
+    <string name="check">조회건수</string>
+    <string name="error">사용자 등록 확인바랍니다.</string>
+    <string name="error_model">차종을 선택하세요.</string>
+    <string name="error_legal">적법불법을 선택하세요.</string>
+    <string name="error_carnumber">차량 번호를 입력하세요.</string>
+    <string name="error_lat">위도를 입력하세요.</string>
+    <string name="error_lng">경도를 입력하세요.</string>
+    <string name="error_inputcarnumber">차량 번호를 올바르게 입력하세요!</string>
+</resources>
