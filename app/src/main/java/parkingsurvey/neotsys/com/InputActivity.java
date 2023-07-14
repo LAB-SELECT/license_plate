@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.location.GpsSatellite;
 import android.location.GpsStatus;
 import android.location.Location;
@@ -19,6 +20,7 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Base64;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.SurfaceView;
@@ -32,6 +34,8 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -43,16 +47,40 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
+
 import android.util.Log;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
+import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.Point;
+import org.opencv.core.Rect;
+import org.opencv.core.Scalar;
+import org.opencv.core.Size;
+import org.opencv.imgproc.Imgproc;
+import org.opencv.utils.Converters;
+import org.tensorflow.lite.Interpreter;
+import org.tensorflow.lite.gpu.GpuDelegate;
 
 import static android.view.View.VISIBLE;
 import static android.Manifest.permission.CAMERA;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+import retrofit2.http.Body;
+import retrofit2.http.Headers;
+import retrofit2.http.POST;
 
 /**
  * Created by ChoiHyunChul on 2017. 3. 27..
@@ -118,6 +146,34 @@ public class InputActivity extends AppCompatActivity implements View.OnClickList
     private Mat matInput;
     private Mat matResult;
     private CameraBridgeViewBase mOpenCvCameraView;
+
+    // 실시간 번호판 탐지 코드
+    private CameraBridgeViewBase m_CameraView;
+    DHDetectionModel detectionModel;
+    GpuDelegate delegate = new GpuDelegate();
+    public Interpreter.Options options = (new Interpreter.Options()).addDelegate(delegate);
+    private Bitmap onFrame; // yolo input
+    private Bitmap onFrame2; // clova input
+    String onFrame2_base64;
+    String before_image = "";
+    boolean cFlag=true;
+    Call<JsonObject> call;
+    public interface OCRService {
+        @Headers({
+                "Content-Type: application/json; charset=utf-8",
+                "X-OCR-SECRET: "
+        })
+        @POST("general")
+        Call<JsonObject> doOCR(@Body JsonObject requestBody);
+    }
+    private static final String BASE_URL = "https://k3jyg1t7lb.apigw.ntruss.com/custom/v1/21307/d6c07e9b3b323a6498af50bc24fc0211e8acd512b02e7df2899181011329a6c7/";
+
+    private final Retrofit retrofit = new Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build();
+
+    private final OCRService ocrService = retrofit.create(OCRService.class);
 
 //    public native void ConvertRGBtoGray(long matAddrInput, long matAddrResult);
 
@@ -213,6 +269,13 @@ public class InputActivity extends AppCompatActivity implements View.OnClickList
         Log.e(TAG, "onCreate -----");
         getInfo = new GetInfo("INFO");
         getInfo.execute();
+
+        try {
+            detectionModel = new DHDetectionModel(this, options);
+        }
+        catch(IOException e){
+            e.printStackTrace();
+        }
     }
 
     // javacamera
@@ -261,6 +324,91 @@ public class InputActivity extends AppCompatActivity implements View.OnClickList
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
 
         matInput = inputFrame.rgba();
+        Mat input = matInput.clone();
+
+        Mat toDetImage = new Mat();
+        Size sz = new Size(256, 192);
+        Imgproc.resize(matInput, toDetImage, sz);
+        onFrame = Bitmap.createBitmap(toDetImage.cols(), toDetImage.rows(), Bitmap.Config.ARGB_8888);
+
+        Utils.matToBitmap(toDetImage, onFrame);
+        //long yolo_s = System.currentTimeMillis();     // 모델 추론 시간 확인을 위한 코드
+        float[][] proposal = detectionModel.getProposal(onFrame, input);
+        //long yolo_e = System.currentTimeMillis();
+        //inferenceTime[0] = yolo_e-yolo_s;
+
+        if(proposal[1][4] < 0.5){ // reject inference
+            return matInput;
+        }
+
+        int w = matInput.width();
+        int h = matInput.height();
+        float[] coord = new float[8];
+        float x_center= proposal[1][0];
+        float y_center = proposal[1][1];
+        float width = proposal[1][2];
+        float height = proposal[1][3];
+
+        coord[0]= (float) (x_center-0.5*width);
+        coord[1]= (float) (y_center-0.5*height);
+        coord[2]= (float) (x_center+0.5*width);
+        coord[3]= (float) (y_center-0.5*height);
+        coord[4]= (float) (x_center+0.5*width);
+        coord[5]= (float) (y_center+0.5*height);
+        coord[6]= (float) (x_center-0.5*width);
+        coord[7]= (float) (y_center+0.5*height);
+
+        int w_ = (int) (0.01 * w);
+        int h_ = (int) (0.01 * h);
+
+        int pt1_x = (int) ((w * coord[0] - w_) > 0 ? (w * coord[0] - w_) : (w * coord[0]));
+        int pt1_y = (int) ((h * coord[1] - h_) > 0 ? (h * coord[1] - h_) : (h * coord[1]));
+
+
+        int pt3_x = (int) ((w * coord[4] + w_) < w ? (w * coord[4] + w_) : (w * coord[4]));
+        int pt3_y = (int) ((h * coord[5] + h_) < h ? (h * coord[5] + h_) : (h * coord[5]));
+
+        int new_w = (int) (pt3_x-pt1_x);
+        int new_h = (int) (pt3_y-pt1_y);
+
+
+        if (((pt1_x < m_CameraView.getLeft()+200) || ((pt1_x + new_w) > m_CameraView.getRight()-400)) || ((pt1_y < m_CameraView.getTop()+200) || ((pt1_y + new_h) > m_CameraView.getBottom()-200)) || (new_w < 50)) {
+            Log.d("log:: ", "Out of Bound");
+        } else {
+            Imgproc.rectangle(matInput, new Point(pt1_x, pt1_y), new Point(pt3_x, pt3_y),
+                    new Scalar(0, 255, 0), 10);
+
+            Log.d("log:: ", "pt1_x: " + pt1_x + " pt1_y: " + pt1_y + " new_w: " + new_w + " new_h: " + new_h);
+
+            Rect roi = new Rect(pt1_x, pt1_y, new_w, new_h);
+            Log.d("log:: ", "x: " + roi.x + " y: " + roi.y + " w: " + roi.width + " h: " + roi.height);
+            Log.d("input log:: ", "cols: " + input.cols() + " rows: " + input.rows());
+            if (roi.x + roi.width > input.cols() || roi.x < 0 || roi.width < 0 || roi.y + roi.height > input.rows() || roi.y < 0 || roi.height < 0)
+                return matInput;
+            Mat croppedImage = new Mat(input, roi);
+//            Mat toDetImage2 = new Mat();
+//            Size sz2 = new Size(128, 128);
+//            Imgproc.resize(croppedImage, toDetImage2, sz2);
+//            onFrame2 = Bitmap.createBitmap(toDetImage2.cols(), toDetImage2.rows(), Bitmap.Config.ARGB_8888);
+//            Utils.matToBitmap(toDetImage2, onFrame2);
+            Mat toplateImage = new Mat();
+            Size sz1 = new Size(1024, 2048);
+            Imgproc.resize(croppedImage, toplateImage, sz1);
+            onFrame2 = Bitmap.createBitmap(toplateImage.cols(), toplateImage.rows(), Bitmap.Config.ARGB_8888);
+            Utils.matToBitmap(toplateImage, onFrame2);
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            onFrame2.compress(Bitmap.CompressFormat.PNG, 200, baos);
+            byte[] bImage = baos.toByteArray();
+            onFrame2_base64 = Base64.encodeToString(bImage, 0);
+
+            if (!(onFrame2_base64.equals(before_image))) {
+                carPlate_num(onFrame2_base64);
+                before_image = onFrame2_base64;
+            }
+
+        }
+
 
         if ( matResult == null )
 
@@ -269,6 +417,72 @@ public class InputActivity extends AppCompatActivity implements View.OnClickList
 //        ConvertRGBtoGray(matInput.getNativeObjAddr(), matResult.getNativeObjAddr());
 
         return matResult;
+    }
+
+    private void carPlate_num (String onFrame2_base64) {
+        if (cFlag) {
+            JsonObject requestBody = new JsonObject();
+            requestBody.addProperty("version", "V2");
+            requestBody.addProperty("requestId", UUID.randomUUID().toString());
+            requestBody.addProperty("timestamp", System.currentTimeMillis());
+
+            JsonObject image = new JsonObject();
+            image.addProperty("format", "png");
+            image.addProperty("name", "carPlate");
+            image.addProperty("data", onFrame2_base64);
+
+            JsonArray images = new JsonArray();
+            images.add(image);
+
+            requestBody.add("images", images);
+            //Log.e("json 파일", String.valueOf(requestBody));
+
+            call = ocrService.doOCR(requestBody);
+            cFlag = false;
+            Log.e("json 파일", String.valueOf(cFlag));
+        } else {
+            call.enqueue(new Callback<JsonObject>() {
+                @Override
+                public void onResponse(Call<JsonObject> call, Response<JsonObject> response) {
+                    String strs="";
+                    if (response.isSuccessful()) {
+                        JsonObject result = response.body();
+                        //Log.e("json 파일", String.valueOf(result));
+                        JsonArray imagesArr = result.getAsJsonArray("images");
+                        //Log.e("json 파일", String.valueOf(imagesArr));
+                        JsonObject firstImageObj = (JsonObject) imagesArr.get(0);
+                        //Log.e("json 파일", String.valueOf(firstImageObj));
+                        JsonArray fieldsArr = firstImageObj.getAsJsonArray("fields");
+                        //Log.e("json 파일", String.valueOf(fieldsArr));
+                        for (int i=0; i<fieldsArr.size(); i++){
+                            JsonObject job = (JsonObject) fieldsArr.get(i);
+                            //Log.e("json 파일", String.valueOf(job));
+                            strs = strs + job.get("inferText");
+                            //.e("json 파일", String.valueOf(job.get("inferText")));
+                        }
+                        //Log.e("json 파일", strs);
+
+                        String carPlate_num = strs.replaceAll("[^ㄱ-ㅎㅏ-ㅣ가-힣0-9]", "");
+                        // 탐지한 번호판 입력
+                        carNumber.setText(carPlate_num);
+                        //Toast.makeText(getApplicationContext(), strs, Toast.LENGTH_LONG).show();
+                        //Toast.makeText(getApplicationContext(), carPlate_num, Toast.LENGTH_LONG).show();
+                        Log.e("텍스트 인식", "성공");
+
+                    } else {
+                        Log.e("텍스트 인식", "실패");
+                    }
+                    cFlag = true;
+                    Log.e("json 파일", String.valueOf(cFlag));
+                }
+                @Override
+                public void onFailure(Call<JsonObject> call, Throwable t) {
+                    Log.e("전송", "실패: ");
+                    cFlag = false;
+                    Log.e("json 파일", String.valueOf(cFlag));
+                }
+            });
+        }
     }
 
 
